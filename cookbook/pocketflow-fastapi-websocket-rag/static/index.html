@@ -27,6 +27,7 @@
             flex-direction: column;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
+            position: relative;
         }
         
         .header {
@@ -87,6 +88,7 @@
             border-top: 1px solid rgba(255, 255, 255, 0.2);
             display: flex;
             gap: 12px;
+            position: relative;
         }
         
         #knowledge { 
@@ -158,6 +160,89 @@
             background: rgba(0,0,0,0.2);
             border-radius: 3px;
         }
+        
+        /* 弹出窗口样式 */
+        .popup-window {
+            position: absolute;
+            bottom: 100%;
+            left: 20px;
+            width: calc(100% - 40px);
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            z-index: 100;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+        
+        .popup-window.active {
+            opacity: 1;
+            transform: translateY(-10px);
+            pointer-events: auto;
+        }
+        
+        .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .popup-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .close-popup {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+            padding: 5px;
+        }
+        
+        .close-popup:hover {
+            color: #333;
+        }
+        
+        .popup-content {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .knowledge-item {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #f9f9f9;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .knowledge-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: transparent;
+            z-index: 90;
+            display: none;
+        }
+        
+        .overlay.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -171,10 +256,25 @@
         
         <div class="input-container">
             <button id="knowledge">KB</button>
+            
+            <!-- 弹出窗口 -->
+            <div class="popup-window" id="knowledgePopup">
+                <div class="popup-header">
+                    <h2>Knowledge Base</h2>
+                    <button class="close-popup">&times;</button>
+                </div>
+                <div class="popup-content">
+                    <div class="knowledge-item">Add Knowledge</div>
+                </div>
+            </div>
+            
             <input type="text" id="messageInput" placeholder="Type your message..." disabled>
             <button id="sendButton" disabled>Send</button>
         </div>
     </div>
+
+    <!-- 覆盖层，用于点击外部关闭弹出窗口 -->
+    <div class="overlay" id="overlay"></div>
 
     <script>
         const ws = new WebSocket(`ws://localhost:8000/ws`);
@@ -183,10 +283,15 @@
         const sendButton = document.getElementById('sendButton');
         const statusDiv = document.getElementById('status');
         const knowledgeButton = document.getElementById('knowledge');
+        const knowledgePopup = document.getElementById('knowledgePopup');
+        const closePopupButton = document.querySelector('.close-popup');
+        const overlay = document.getElementById('overlay');
         
         let isStreaming = false;
         let currentAiMessage = null;
+        let isPopupOpen = false;
 
+        // WebSocket 连接逻辑
         ws.onopen = function() {
             statusDiv.textContent = 'Connected';
             messageInput.disabled = false;
@@ -246,6 +351,21 @@
             }
         }
 
+        // 切换弹出窗口显示/隐藏
+        function togglePopup() {
+            isPopupOpen = !isPopupOpen;
+            knowledgePopup.classList.toggle('active', isPopupOpen);
+            overlay.classList.toggle('active', isPopupOpen);
+        }
+
+        // 关闭弹出窗口
+        function closePopup() {
+            isPopupOpen = false;
+            knowledgePopup.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+
+        // 事件监听器
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -254,8 +374,23 @@
             }
         });
 
-        knowledgeButton.addEventListener('click', function() {
-            
+        // 知识库按钮点击事件
+        knowledgeButton.addEventListener('click', togglePopup);
+        
+        // 关闭按钮点击事件
+        closePopupButton.addEventListener('click', closePopup);
+        
+        // 点击覆盖层关闭弹出窗口
+        overlay.addEventListener('click', closePopup);
+        
+        // 知识库项点击事件
+        document.querySelectorAll('.knowledge-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const knowledgeText = this.textContent;
+                messageInput.value = `Tell me about ${knowledgeText}`;
+                closePopup();
+                messageInput.focus();
+            });
         });
     </script>
 </body>
