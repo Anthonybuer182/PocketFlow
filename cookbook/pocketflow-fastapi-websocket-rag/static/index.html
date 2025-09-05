@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>PocketFlow Chat</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PocketFlow Chat with Icon</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -92,20 +94,23 @@
         }
         
         #knowledge { 
-            padding: 12px 24px;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
             border: none;
-            border-radius: 25px;
+            border-radius: 50%;
             cursor: pointer;
-            font-size: 15px;
-            font-weight: 600;
+            font-size: 20px;
             transition: all 0.2s ease;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
         #knowledge:hover {
-            transform: translateY(-1px);
+            transform: translateY(-2px) rotate(5deg);
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
         
@@ -243,6 +248,19 @@
         .overlay.active {
             display: block;
         }
+        
+        .icon-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .icon-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -255,7 +273,9 @@
         <div class="messages" id="messages"></div>
         
         <div class="input-container">
-            <button id="knowledge">KB</button>
+            <button id="knowledge" title="Knowledge Base">
+                <i class="fas fa-book"></i>
+            </button>
             
             <!-- 弹出窗口 -->
             <div class="popup-window" id="knowledgePopup">
@@ -268,8 +288,8 @@
                 </div>
             </div>
             
-            <input type="text" id="messageInput" placeholder="Type your message..." disabled>
-            <button id="sendButton" disabled>Send</button>
+            <input type="text" id="messageInput" placeholder="Type your message...">
+            <button id="sendButton">Send</button>
         </div>
     </div>
 

@@ -11,6 +11,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def get_chat_interface():
     return FileResponse("static/index.html")
 
+@app.get("/add_knowledge.html")
+async def get_progress_page():
+    """Add knowledge page"""
+    return FileResponse("static/add_knowledge.html")
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
