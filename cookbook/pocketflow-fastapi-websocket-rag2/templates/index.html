@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 知识库系统</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3a0ca3;
+            --accent: #f72585;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --success: #4cc9f0;
+            --border: #dee2e6;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --radius: 12px;
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: var(--dark);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        
+        .tabs {
+            display: flex;
+            background: white;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .tab {
+            padding: 18px 30px;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
+            transition: var(--transition);
+            font-weight: 600;
+            color: #6c757d;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+        }
+        
+        .tab:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 30px;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        h2 {
+            margin-bottom: 20px;
+            color: var(--dark);
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: var(--transition);
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+        
+        button {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            padding: 14px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        button.secondary {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        
+        .kb-list {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .kb-item {
+            background: white;
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--primary);
+            transition: var(--transition);
+        }
+        
+        .kb-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .kb-item h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        
+        .kb-item p {
+            color: #6c757d;
+            margin-bottom: 15px;
+        }
+        
+        .kb-item .meta {
+            font-size: 0.85rem;
+            color: #adb5bd;
+        }
+        
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        
+        .chat-header {
+            padding: 15px 20px;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 18px;
+            max-width: 80%;
+            position: relative;
+            animation: messageAppear 0.3s ease;
+        }
+        
+        @keyframes messageAppear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-message {
+            background: var(--primary);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .bot-message {
+            background: white;
+            color: var(--dark);
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .context-message {
+            background: #e9ecef;
+            color: #495057;
+            font-size: 0.9rem;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            background: white;
+            border-top: 1px solid var(--border);
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            margin: 0;
+        }
+        
+        .kb-selector {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .kb-selector-btn {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .kb-selector-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background: white;
+            min-width: 250px;
+            box-shadow: var(--shadow);
+            border-radius: var(--radius);
+            padding: 15px;
+            z-index: 100;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .kb-selector-content.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .kb-selector-item {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .kb-selector-item:last-child {
+            border-bottom: none;
+        }
+        
+        .selected-kbs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .selected-kb {
+            background: var(--primary);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .status-message {
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .success {
+            background: #e6f7ee;
+            color: #28a745;
+        }
+        
+        .error {
+            background: #fde8e8;
+            color: #dc3545;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #adb5bd;
+        }
+        
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .chat-container {
+                height: 500px;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-brain"></i> RAG 知识库系统</h1>
+            <p>上传文档构建知识库，并与AI助手进行智能对话</p>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('document-tab')"><i class="fas fa-file-upload"></i> 文档管理</div>
+            <div class="tab" onclick="switchTab('chat-tab')"><i class="fas fa-comments"></i> 智能聊天</div>
+        </div>
+
+        <div id="document-tab" class="tab-content active">
+            <h2><i class="fas fa-plus-circle"></i> 创建知识库</h2>
+            <div class="form-group">
+                <label for="kb-name">知识库名称</label>
+                <input type="text" id="kb-name" placeholder="输入知识库名称">
+            </div>
+            <div class="form-group">
+                <label for="kb-description">知识库描述</label>
+                <textarea id="kb-description" placeholder="输入知识库描述" rows="3"></textarea>
+            </div>
+            <button onclick="createKnowledgeBase()"><i class="fas fa-save"></i> 创建知识库</button>
+
+            <h2><i class="fas fa-upload"></i> 上传文档</h2>
+            <div class="form-group">
+                <label for="kb-select">选择知识库</label>
+                <select id="kb-select">
+                    <option value="">-- 选择知识库 --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="document-file">选择文档</label>
+                <input type="file" id="document-file">
+            </div>
+            <button onclick="uploadDocument()"><i class="fas fa-cloud-upload-alt"></i> 上传文档</button>
+
+            <h2><i class="fas fa-books"></i> 知识库列表</h2>
+            <div id="knowledge-bases" class="kb-list">
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>暂无知识库，请先创建知识库</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-tab" class="tab-content">
+            <div class="chat-header">
+                <h2><i class="fas fa-comment-dots"></i> 智能聊天</h2>
+                <div class="kb-selector">
+                    <div class="kb-selector-btn" onclick="toggleKnowledgeBaseSelector()">
+                        <i class="fas fa-book"></i> 选择知识库
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div id="knowledge-base-selector" class="kb-selector-content">
+                        <div class="empty-state">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>加载中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="selected-kbs" class="selected-kbs"></div>
+
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="message bot-message">
+                        <strong>AI助手</strong>
+                        <p>您好！我是AI助手，请问有什么可以帮助您的？</p>
+                    </div>
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="message-input" placeholder="输入您的问题..." onkeypress="handleKeyPress(event)">
+                    <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i> 发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedKnowledgeBases = [];
+        let websocket = null;
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            loadKnowledgeBases();
+            initWebSocket();
+        });
+
+        // 切换标签页
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`.tab:nth-child(${tabId === 'document-tab' ? 1 : 2})`).classList.add('active');
+            
+            if (tabId === 'chat-tab') {
+                loadKnowledgeBases();
+            }
+        }
+
+        // 加载知识库列表
+        async function loadKnowledgeBases() {
+            try {
+                const response = await fetch('/api/knowledge_bases');
+                const knowledgeBases = await response.json();
+                
+                // 更新文档管理页面的下拉选择框
+                const kbSelect = document.getElementById('kb-select');
+                kbSelect.innerHTML = '<option value="">-- 选择知识库 --</option>';
+                knowledgeBases.forEach(kb => {
+                    const option = document.createElement('option');
+                    option.value = kb.id;
+                    option.textContent = kb.name;
+                    kbSelect.appendChild(option);
+                });
+                
+                // 更新知识库列表
+                const kbList = document.getElementById('knowledge-bases');
+                if (knowledgeBases.length === 0) {
+                    kbList.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>暂无知识库，请先创建知识库</p>
+                        </div>
+                    `;
+                } else {
+                    kbList.innerHTML = '';
+                    knowledgeBases.forEach(kb => {
+                        const kbItem = document.createElement('div');
+                        kbItem.className = 'kb-item';
+                        kbItem.innerHTML = `
+                            <h3>${kb.name}</h3>
+                            <p>${kb.description || '暂无描述'}</p>
+                            <p class="meta"><i class="fas fa-clock"></i> 创建时间: ${new Date(kb.created_at).toLocaleString()}</p>
+                        `;
+                        kbList.appendChild(kbItem);
+                    });
+                }
+                
+                // 更新聊天页面的知识库选择器
+                const kbSelector = document.getElementById('knowledge-base-selector');
+                if (knowledgeBases.length === 0) {
+                    kbSelector.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <p>暂无知识库，请先创建知识库</p>
+                        </div>
+                    `;
+                } else {
+                    kbSelector.innerHTML = '';
+                    knowledgeBases.forEach(kb => {
+                        const kbItem = document.createElement('div');
+                        kbItem.className = 'kb-selector-item';
+                        kbItem.innerHTML = `
+                            <input type="checkbox" id="selector-kb-${kb.id}" value="${kb.id}" 
+                                ${selectedKnowledgeBases.includes(kb.id) ? 'checked' : ''}>
+                            <label for="selector-kb-${kb.id}">${kb.name}</label>
+                        `;
+                        kbSelector.appendChild(kbItem);
+                        
+                        // 添加事件监听器
+                        document.getElementById(`selector-kb-${kb.id}`).addEventListener('change', function() {
+                            updateSelectedKnowledgeBases();
+                        });
+                    });
+                }
+                
+            } catch (error) {
+                console.error('加载知识库失败:', error);
+            }
+        }
+
+        // 更新选中的知识库
+        function updateSelectedKnowledgeBases() {
+            selectedKnowledgeBases = [];
+            document.querySelectorAll('#knowledge-base-selector input:checked').forEach(checkbox => {
+                selectedKnowledgeBases.push(checkbox.value);
+            });
+            
+            const selectedKbsElement = document.getElementById('selected-kbs');
+            selectedKbsElement.innerHTML = '';
+            
+            if (selectedKnowledgeBases.length > 0) {
+                selectedKnowledgeBases.forEach(kbId => {
+                    const kbName = document.querySelector(`label[for="selector-kb-${kbId}"]`).textContent;
+                    const selectedKb = document.createElement('div');
+                    selectedKb.className = 'selected-kb';
+                    selectedKb.innerHTML = `
+                        ${kbName}
+                        <i class="fas fa-times" onclick="deselectKnowledgeBase('${kbId}')"></i>
+                    `;
+                    selectedKbsElement.appendChild(selectedKb);
+                });
+            } else {
+                selectedKbsElement.innerHTML = '<div class="context-message">未选择知识库，将使用通用知识回答</div>';
+            }
+        }
+
+        // 取消选择知识库
+        function deselectKnowledgeBase(kbId) {
+            const checkbox = document.getElementById(`selector-kb-${kbId}`);
+            checkbox.checked = false;
+            updateSelectedKnowledgeBases();
+        }
+
+        // 显示/隐藏知识库选择器
+        function toggleKnowledgeBaseSelector() {
+            const selector = document.getElementById('knowledge-base-selector');
+            selector.classList.toggle('show');
+        }
+
+        // 点击外部关闭选择器
+        window.addEventListener('click', function(e) {
+            const selector = document.getElementById('knowledge-base-selector');
+            const selectorBtn = document.querySelector('.kb-selector-btn');
+            if (!selector.contains(e.target) && !selectorBtn.contains(e.target)) {
+                selector.classList.remove('show');
+            }
+        });
+
+        // 创建知识库
+        async function createKnowledgeBase() {
+            const name = document.getElementById('kb-name').value;
+            const description = document.getElementById('kb-description').value;
+            
+            if (!name) {
+                alert('请输入知识库名称');
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('description', description);
+                
+                const response = await fetch('/api/create_kb', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('知识库创建成功');
+                    document.getElementById('kb-name').value = '';
+                    document.getElementById('kb-description').value = '';
+                    loadKnowledgeBases();
+                } else {
+                    alert('知识库创建失败');
+                }
+            } catch (error) {
+                console.error('创建知识库失败:', error);
+                alert('创建知识库失败');
+            }
+        }
+
+        // 上传文档
+        async function uploadDocument() {
+            const kbId = document.getElementById('kb-select').value;
+            const fileInput = document.getElementById('document-file');
+            const file = fileInput.files[0];
+            
+            if (!kbId) {
+                alert('请选择知识库');
+                return;
+            }
+            
+            if (!file) {
+                alert('请选择文件');
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('kb_id', kbId);
+                formData.append('file', file);
+                
+                const response = await fetch('/api/upload_document', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('文档上传成功');
+                    fileInput.value = '';
+                } else {
+                    alert('文档上传失败');
+                }
+            } catch (error) {
+                console.error('上传文档失败:', error);
+                alert('上传文档失败');
+            }
+        }
+
+        // 初始化WebSocket连接
+        function initWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/chat`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function() {
+                console.log('WebSocket连接已建立');
+            };
+            
+            websocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'response') {
+                    addMessage(data.message, 'bot');
+                } else if (data.type === 'context') {
+                    addContextMessage(data.context);
+                }
+            };
+            
+            websocket.onclose = function() {
+                console.log('WebSocket连接已关闭，尝试重新连接...');
+                setTimeout(initWebSocket, 3000);
+            };
+            
+            websocket.onerror = function(error) {
+                console.error('WebSocket错误:', error);
+            };
+        }
+
+        // 发送消息
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // 添加用户消息到聊天界面
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // 通过WebSocket发送消息
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({
+                    type: 'message',
+                    message: message,
+                    selected_kbs: selectedKnowledgeBases
+                }));
+            } else {
+                addMessage('连接已断开，请刷新页面重试', 'bot');
+            }
+        }
+
+        // 处理按键事件
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // 添加消息到聊天界面
+        function addMessage(text, sender) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${sender}-message`;
+            messageElement.innerHTML = `
+                <strong>${sender === 'user' ? '您' : 'AI助手'}</strong>
+                <p>${text}</p>
+            `;
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 添加上下文消息
+        function addContextMessage(text) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'context-message';
+            messageElement.innerHTML = `<i class="fas fa-info-circle"></i> ${text}`;
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>

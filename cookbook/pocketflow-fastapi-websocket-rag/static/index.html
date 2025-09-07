@@ -234,21 +234,6 @@
             background: #f0f0f0;
         }
         
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: transparent;
-            z-index: 90;
-            display: none;
-        }
-        
-        .overlay.active {
-            display: block;
-        }
-        
         .icon-container {
             display: flex;
             flex-direction: column;
@@ -293,9 +278,6 @@
         </div>
     </div>
 
-    <!-- 覆盖层，用于点击外部关闭弹出窗口 -->
-    <div class="overlay" id="overlay"></div>
-
     <script>
         const ws = new WebSocket(`ws://localhost:8000/ws`);
         const messagesDiv = document.getElementById('messages');
@@ -305,7 +287,6 @@
         const knowledgeButton = document.getElementById('knowledge');
         const knowledgePopup = document.getElementById('knowledgePopup');
         const closePopupButton = document.querySelector('.close-popup');
-        const overlay = document.getElementById('overlay');
         
         let isStreaming = false;
         let currentAiMessage = null;
@@ -375,14 +356,12 @@
         function togglePopup() {
             isPopupOpen = !isPopupOpen;
             knowledgePopup.classList.toggle('active', isPopupOpen);
-            overlay.classList.toggle('active', isPopupOpen);
         }
 
         // 关闭弹出窗口
         function closePopup() {
             isPopupOpen = false;
             knowledgePopup.classList.remove('active');
-            overlay.classList.remove('active');
         }
 
         // 事件监听器
@@ -400,16 +379,14 @@
         // 关闭按钮点击事件
         closePopupButton.addEventListener('click', closePopup);
         
-        // 点击覆盖层关闭弹出窗口
-        overlay.addEventListener('click', closePopup);
-        
         // 知识库项点击事件
         document.querySelectorAll('.knowledge-item').forEach(item => {
             item.addEventListener('click', function() {
                 const knowledgeText = this.textContent;
-                messageInput.value = `Tell me about ${knowledgeText}`;
+                if (knowledgeText === 'Add Knowledge') {
+                    window.location.href = '/add_knowledge.html';
+                }
                 closePopup();
-                messageInput.focus();
             });
         });
     </script>
