@@ -542,19 +542,26 @@
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
+            padding: 16px 28px;
+            border-radius: 12px;
             cursor: pointer;
+            font-size: 16px;
             font-weight: 600;
-            transition: var(--transition);
+            transition: all 0.3s ease;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(110, 142, 251, 0.3);
         }
         
         .upload-btn:hover {
-            transform: translateY(-2px);
+            transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(110, 142, 251, 0.4);
+            background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+        }
+        
+        .upload-btn:active {
+            transform: translateY(-1px);
         }
         
         /* 文档列表样式 */
@@ -565,29 +572,35 @@
         .document-item {
             display: flex;
             align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid var(--border);
+            padding: 20px;
+            border-radius: var(--radius);
+            background: white;
+            box-shadow: var(--shadow);
+            margin-bottom: 15px;
             transition: var(--transition);
+            border-left: 4px solid var(--primary);
         }
         
         .document-item:hover {
-            background: #f8f9fa;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(110, 142, 251, 0.2);
+            background: linear-gradient(to right, rgba(110, 142, 251, 0.02), transparent);
         }
         
         .document-icon {
-            width: 40px;
-            height: 40px;
-            background: rgba(110, 142, 251, 0.1);
-            border-radius: 8px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, rgba(110, 142, 251, 0.1) 0%, rgba(167, 119, 227, 0.1) 100%);
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 15px;
+            margin-right: 20px;
         }
         
         .document-icon i {
             color: var(--primary);
-            font-size: 1.2rem;
+            font-size: 1.4rem;
         }
         
         .document-info {
@@ -596,32 +609,51 @@
         
         .document-name {
             font-weight: 600;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             color: var(--dark);
+            font-size: 1.1rem;
         }
         
         .document-meta {
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             color: #6c757d;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .document-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         
         .document-actions {
             display: flex;
-            gap: 10px;
+            gap: 12px;
         }
         
         .action-btn {
-            background: none;
-            border: none;
-            color: #6c757d;
+            background: linear-gradient(135deg, rgba(110, 142, 251, 0.1) 0%, rgba(167, 119, 227, 0.1) 100%);
+            border: 1px solid rgba(110, 142, 251, 0.2);
+            color: var(--primary);
             cursor: pointer;
             font-size: 1.1rem;
             transition: var(--transition);
-            padding: 5px;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
         }
         
         .action-btn:hover {
-            color: var(--primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(110, 142, 251, 0.3);
         }
         
         /* 响应式设计增强 */
@@ -1076,7 +1108,11 @@
                 </div>
                 <div class="document-info">
                     <div class="document-name">${doc.name}</div>
-                    <div class="document-meta">${doc.date} ${doc.time} - ${doc.size}</div>
+                    <div class="document-meta">
+                        <span><i class="fas fa-calendar"></i> ${doc.date}</span>
+                        <span><i class="fas fa-clock"></i> ${doc.time}</span>
+                        <span><i class="fas fa-weight-hanging"></i> ${doc.size}</span>
+                    </div>
                 </div>
                 <div class="document-actions">
                     <button class="action-btn" title="下载"><i class="fas fa-download"></i></button>
