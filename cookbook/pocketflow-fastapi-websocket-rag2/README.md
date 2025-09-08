@@ -4,7 +4,10 @@ Real-time chat interface with streaming LLM responses using PocketFlow, FastAPI,
 
 <p align="center">
   <img 
-    src="./assets/image.png" width="800"
+    src="./assets/chat.png" width="800"
+  />
+ <img 
+    src="./assets/knowledge.png" width="800"
   />
 </p>
 ## How It Works
