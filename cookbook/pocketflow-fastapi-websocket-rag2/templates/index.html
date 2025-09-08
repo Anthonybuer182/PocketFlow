@@ -502,6 +502,128 @@
             left: 100%;
         }
         
+        /* 上传区域样式 */
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 40px;
+            text-align: center;
+            transition: var(--transition);
+            background: #fafbfc;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(110, 142, 251, 0.05);
+        }
+        
+        .upload-area i {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        
+        .upload-area h3 {
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+        
+        .upload-area p {
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(110, 142, 251, 0.4);
+        }
+        
+        /* 文档列表样式 */
+        .document-list {
+            margin-top: 30px;
+        }
+        
+        .document-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+            transition: var(--transition);
+        }
+        
+        .document-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .document-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(110, 142, 251, 0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+        
+        .document-icon i {
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+        
+        .document-info {
+            flex: 1;
+        }
+        
+        .document-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--dark);
+        }
+        
+        .document-meta {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .document-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .action-btn {
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: var(--transition);
+            padding: 5px;
+        }
+        
+        .action-btn:hover {
+            color: var(--primary);
+        }
+        
         /* 响应式设计增强 */
         @media (max-width: 1024px) {
             .container {
@@ -672,35 +794,26 @@
         </div>
 
         <div id="document-tab" class="tab-content">
-            <h2><i class="fas fa-plus-circle"></i> 创建知识库</h2>
-            <div class="form-group">
-                <label for="kb-name">知识库名称</label>
-                <input type="text" id="kb-name" placeholder="输入知识库名称">
+            <div class="upload-section">
+                <h2><i class="fas fa-cloud-upload-alt"></i> 上传文档</h2>
+                <div class="upload-area" id="upload-area">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>拖拽文件到这里</h3>
+                    <p>支持 TXT, MD, HTML, PDF, DOCX, PPTX, XLSX, EPUB... 格式</p>
+                    <input type="file" id="file-input" class="file-input" multiple>
+                    <button class="upload-btn" onclick="document.getElementById('file-input').click()">
+                        <i class="fas fa-plus"></i> 选择文件
+                    </button>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="kb-description">知识库描述</label>
-                <textarea id="kb-description" placeholder="输入知识库描述" rows="3"></textarea>
-            </div>
-            <button onclick="createKnowledgeBase()"><i class="fas fa-save"></i> 创建知识库</button>
 
-            <h2><i class="fas fa-upload"></i> 上传文档</h2>
-            <div class="form-group">
-                <label for="kb-select">选择知识库</label>
-                <select id="kb-select">
-                    <option value="">-- 选择知识库 --</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="document-file">选择文档</label>
-                <input type="file" id="document-file">
-            </div>
-            <button onclick="uploadDocument()"><i class="fas fa-cloud-upload-alt"></i> 上传文档</button>
-
-            <h2><i class="fas fa-books"></i> 知识库列表</h2>
-            <div id="knowledge-bases" class="kb-list">
-                <div class="empty-state">
-                    <i class="fas fa-inbox"></i>
-                    <p>暂无知识库，请先创建知识库</p>
+            <div class="document-list-section">
+                <h2><i class="fas fa-list"></i> 文档列表</h2>
+                <div class="document-list" id="document-list">
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>暂无文档，请上传文件</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -739,6 +852,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadKnowledgeBases();
             initWebSocket();
+            initDocumentUpload();
         });
 
         // 切换标签页
@@ -763,39 +877,6 @@
             try {
                 const response = await fetch('/api/knowledge_bases');
                 const knowledgeBases = await response.json();
-                
-                // 更新文档管理页面的下拉选择框
-                const kbSelect = document.getElementById('kb-select');
-                kbSelect.innerHTML = '<option value="">-- 选择知识库 --</option>';
-                knowledgeBases.forEach(kb => {
-                    const option = document.createElement('option');
-                    option.value = kb.id;
-                    option.textContent = kb.name;
-                    kbSelect.appendChild(option);
-                });
-                
-                // 更新知识库列表
-                const kbList = document.getElementById('knowledge-bases');
-                if (knowledgeBases.length === 0) {
-                    kbList.innerHTML = `
-                        <div class="empty-state">
-                            <i class="fas fa-inbox"></i>
-                            <p>暂无知识库，请先创建知识库</p>
-                        </div>
-                    `;
-                } else {
-                    kbList.innerHTML = '';
-                    knowledgeBases.forEach(kb => {
-                        const kbItem = document.createElement('div');
-                        kbItem.className = 'kb-item';
-                        kbItem.innerHTML = `
-                            <h3>${kb.name}</h3>
-                            <p>${kb.description || '暂无描述'}</p>
-                            <p class="meta"><i class="fas fa-clock"></i> 创建时间: ${new Date(kb.created_at).toLocaleString()}</p>
-                        `;
-                        kbList.appendChild(kbItem);
-                    });
-                }
                 
                 // 更新聊天页面的知识库选择器
                 const kbSelector = document.getElementById('knowledge-base-selector');
@@ -840,79 +921,6 @@
             }
         });
 
-        // 创建知识库
-        async function createKnowledgeBase() {
-            const name = document.getElementById('kb-name').value;
-            const description = document.getElementById('kb-description').value;
-            
-            if (!name) {
-                alert('请输入知识库名称');
-                return;
-            }
-            
-            try {
-                const formData = new FormData();
-                formData.append('name', name);
-                formData.append('description', description);
-                
-                const response = await fetch('/api/create_kb', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                if (result.status === 'success') {
-                    alert('知识库创建成功');
-                    document.getElementById('kb-name').value = '';
-                    document.getElementById('kb-description').value = '';
-                    loadKnowledgeBases();
-                } else {
-                    alert('知识库创建失败');
-                }
-            } catch (error) {
-                console.error('创建知识库失败:', error);
-                alert('创建知识库失败');
-            }
-        }
-
-        // 上传文档
-        async function uploadDocument() {
-            const kbId = document.getElementById('kb-select').value;
-            const fileInput = document.getElementById('document-file');
-            const file = fileInput.files[0];
-            
-            if (!kbId) {
-                alert('请选择知识库');
-                return;
-            }
-            
-            if (!file) {
-                alert('请选择文件');
-                return;
-            }
-            
-            try {
-                const formData = new FormData();
-                formData.append('kb_id', kbId);
-                formData.append('file', file);
-                
-                const response = await fetch('/api/upload_document', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                if (result.status === 'success') {
-                    alert('文档上传成功');
-                    fileInput.value = '';
-                } else {
-                    alert('文档上传失败');
-                }
-            } catch (error) {
-                console.error('上传文档失败:', error);
-                alert('上传文档失败');
-            }
-        }
 
         // 初始化WebSocket连接
         function initWebSocket() {
@@ -994,6 +1002,121 @@
             messageElement.innerHTML = `<i class="fas fa-info-circle"></i> ${text}`;
             messagesContainer.appendChild(messageElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 初始化文档上传功能
+        function initDocumentUpload() {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            
+            // 处理文件选择
+            fileInput.addEventListener('change', function(e) {
+                const files = e.target.files;
+                if (files.length > 0) {
+                    handleFiles(files);
+                }
+            });
+            
+            // 拖拽上传功能
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', function() {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFiles(files);
+                }
+            });
+        }
+
+        // 处理上传的文件
+        function handleFiles(files) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                console.log('上传文件:', file.name);
+                
+                // 这里应该添加上传到服务器的代码
+                // 模拟上传成功后的操作
+                addDocumentToList({
+                    name: file.name,
+                    size: formatFileSize(file.size),
+                    date: new Date().toLocaleDateString(),
+                    time: new Date().toLocaleTimeString()
+                });
+            }
+            
+            // 清空文件选择框，允许重复选择相同文件
+            document.getElementById('file-input').value = '';
+        }
+
+        // 添加文档到列表
+        function addDocumentToList(doc) {
+            const documentList = document.getElementById('document-list');
+            
+            // 移除空状态提示（如果有）
+            const emptyState = documentList.querySelector('.empty-state');
+            if (emptyState) {
+                documentList.removeChild(emptyState);
+            }
+            
+            const documentItem = document.createElement('div');
+            documentItem.className = 'document-item';
+            documentItem.innerHTML = `
+                <div class="document-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="document-info">
+                    <div class="document-name">${doc.name}</div>
+                    <div class="document-meta">${doc.date} ${doc.time} - ${doc.size}</div>
+                </div>
+                <div class="document-actions">
+                    <button class="action-btn" title="下载"><i class="fas fa-download"></i></button>
+                    <button class="action-btn" title="删除"><i class="fas fa-trash"></i></button>
+                </div>
+            `;
+            
+            // 添加删除功能
+            const deleteBtn = documentItem.querySelector('.action-btn:last-child');
+            deleteBtn.addEventListener('click', function() {
+                documentList.removeChild(documentItem);
+                
+                // 如果没有文档了，显示空状态
+                if (documentList.children.length === 0) {
+                    showEmptyState();
+                }
+            });
+            
+            documentList.appendChild(documentItem);
+        }
+
+        // 显示空状态
+        function showEmptyState() {
+            const documentList = document.getElementById('document-list');
+            const emptyState = document.createElement('div');
+            emptyState.className = 'empty-state';
+            emptyState.innerHTML = `
+                <i class="fas fa-inbox"></i>
+                <p>暂无文档，请上传文件</p>
+            `;
+            documentList.appendChild(emptyState);
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
     </script>
 </body>
