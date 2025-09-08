@@ -65,7 +65,6 @@
         .tabs {
             display: flex;
             background: white;
-            border-bottom: 2px solid var(--border);
             padding: 0 20px;
         }
         
@@ -77,6 +76,7 @@
             transition: var(--transition);
             font-weight: 600;
             color: #6c757d;
+            border-bottom: 3px solid transparent;
             position: relative;
         }
         
@@ -92,14 +92,13 @@
         .tab::after {
             content: '';
             position: absolute;
-            bottom: -3px;
+            bottom: -2px;
             left: 50%;
             width: 0;
             height: 3px;
             background: var(--primary);
             transition: all 0.3s ease;
             transform: translateX(-50%);
-            border-radius: 3px;
         }
         
         .tab.active::after {
@@ -342,6 +341,7 @@
             border-top: 1px solid rgba(110, 142, 251, 0.1);
             gap: 12px;
             align-items: center;
+            position: relative;
         }
         
         .chat-input input {
@@ -384,17 +384,38 @@
             gap: 8px;
         }
         
+        .kb-selector-icon-btn {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            transition: var(--transition);
+        }
+        
+        .kb-selector-icon-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.05);
+        }
+        
         .kb-selector-content {
             display: none;
             position: absolute;
+            bottom: calc(100% + 10px);
+            left: 0;
             right: 0;
             background: white;
-            min-width: 250px;
             box-shadow: var(--shadow);
             border-radius: var(--radius);
             padding: 15px;
             z-index: 100;
-            margin-top: 10px;
             max-height: 300px;
             overflow-y: auto;
         }
@@ -414,24 +435,6 @@
         
         .kb-selector-item:last-child {
             border-bottom: none;
-        }
-        
-        .selected-kbs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        
-        .selected-kb {
-            background: var(--primary);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 5px;
         }
         
         .status-message {
@@ -578,7 +581,7 @@
             
             .kb-selector-content {
                 left: 0;
-                right: auto;
+                right: 0;
                 min-width: 100%;
             }
             
@@ -703,24 +706,6 @@
         </div>
 
         <div id="chat-tab" class="tab-content active">
-            <div class="chat-header">
-                <h2><i class="fas fa-comment-dots"></i> 智能聊天</h2>
-                <div class="kb-selector">
-                    <div class="kb-selector-btn" onclick="toggleKnowledgeBaseSelector()">
-                        <i class="fas fa-book"></i> 选择知识库
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div id="knowledge-base-selector" class="kb-selector-content">
-                        <div class="empty-state">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p>加载中...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="selected-kbs" class="selected-kbs"></div>
-
             <div class="chat-container">
                 <div id="chat-messages" class="chat-messages">
                     <div class="message bot-message">
@@ -729,15 +714,25 @@
                     </div>
                 </div>
                 <div class="chat-input">
+                    <div class="kb-selector">
+                        <div class="kb-selector-icon-btn" onclick="toggleKnowledgeBaseSelector()">
+                            <i class="fas fa-book"></i>
+                        </div>
+                    </div>
                     <input type="text" id="message-input" placeholder="输入您的问题..." onkeypress="handleKeyPress(event)">
                     <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i> 发送</button>
+                    <div id="knowledge-base-selector" class="kb-selector-content">
+                        <div class="empty-state">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>加载中...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let selectedKnowledgeBases = [];
         let websocket = null;
 
         // 初始化页面
@@ -817,16 +812,10 @@
                         const kbItem = document.createElement('div');
                         kbItem.className = 'kb-selector-item';
                         kbItem.innerHTML = `
-                            <input type="checkbox" id="selector-kb-${kb.id}" value="${kb.id}" 
-                                ${selectedKnowledgeBases.includes(kb.id) ? 'checked' : ''}>
+                            <input type="checkbox" id="selector-kb-${kb.id}" value="${kb.id}">
                             <label for="selector-kb-${kb.id}">${kb.name}</label>
                         `;
                         kbSelector.appendChild(kbItem);
-                        
-                        // 添加事件监听器
-                        document.getElementById(`selector-kb-${kb.id}`).addEventListener('change', function() {
-                            updateSelectedKnowledgeBases();
-                        });
                     });
                 }
                 
@@ -835,38 +824,6 @@
             }
         }
 
-        // 更新选中的知识库
-        function updateSelectedKnowledgeBases() {
-            selectedKnowledgeBases = [];
-            document.querySelectorAll('#knowledge-base-selector input:checked').forEach(checkbox => {
-                selectedKnowledgeBases.push(checkbox.value);
-            });
-            
-            const selectedKbsElement = document.getElementById('selected-kbs');
-            selectedKbsElement.innerHTML = '';
-            
-            if (selectedKnowledgeBases.length > 0) {
-                selectedKnowledgeBases.forEach(kbId => {
-                    const kbName = document.querySelector(`label[for="selector-kb-${kbId}"]`).textContent;
-                    const selectedKb = document.createElement('div');
-                    selectedKb.className = 'selected-kb';
-                    selectedKb.innerHTML = `
-                        ${kbName}
-                        <i class="fas fa-times" onclick="deselectKnowledgeBase('${kbId}')"></i>
-                    `;
-                    selectedKbsElement.appendChild(selectedKb);
-                });
-            } else {
-                selectedKbsElement.innerHTML = '<div class="context-message">未选择知识库，将使用通用知识回答</div>';
-            }
-        }
-
-        // 取消选择知识库
-        function deselectKnowledgeBase(kbId) {
-            const checkbox = document.getElementById(`selector-kb-${kbId}`);
-            checkbox.checked = false;
-            updateSelectedKnowledgeBases();
-        }
 
         // 显示/隐藏知识库选择器
         function toggleKnowledgeBaseSelector() {
@@ -877,7 +834,7 @@
         // 点击外部关闭选择器
         window.addEventListener('click', function(e) {
             const selector = document.getElementById('knowledge-base-selector');
-            const selectorBtn = document.querySelector('.kb-selector-btn');
+            const selectorBtn = document.querySelector('.kb-selector-icon-btn');
             if (!selector.contains(e.target) && !selectorBtn.contains(e.target)) {
                 selector.classList.remove('show');
             }
@@ -1002,8 +959,7 @@
             if (websocket && websocket.readyState === WebSocket.OPEN) {
                 websocket.send(JSON.stringify({
                     type: 'message',
-                    message: message,
-                    selected_kbs: selectedKnowledgeBases
+                    message: message
                 }));
             } else {
                 addMessage('连接已断开，请刷新页面重试', 'bot');
