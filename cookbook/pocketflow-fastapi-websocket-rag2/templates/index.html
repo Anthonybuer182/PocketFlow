@@ -393,11 +393,11 @@
         </header>
 
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('document-tab')"><i class="fas fa-file-upload"></i> 文档管理</div>
-            <div class="tab" onclick="switchTab('chat-tab')"><i class="fas fa-comments"></i> 智能聊天</div>
+            <div class="tab active" onclick="switchTab('chat-tab')"><i class="fas fa-comments"></i> 智能聊天</div>
+            <div class="tab" onclick="switchTab('document-tab')"><i class="fas fa-file-upload"></i> 文档管理</div>
         </div>
 
-        <div id="document-tab" class="tab-content active">
+        <div id="document-tab" class="tab-content">
             <h2><i class="fas fa-plus-circle"></i> 创建知识库</h2>
             <div class="form-group">
                 <label for="kb-name">知识库名称</label>
@@ -431,7 +431,7 @@
             </div>
         </div>
 
-        <div id="chat-tab" class="tab-content">
+        <div id="chat-tab" class="tab-content active">
             <div class="chat-header">
                 <h2><i class="fas fa-comment-dots"></i> 智能聊天</h2>
                 <div class="kb-selector">
@@ -485,7 +485,7 @@
             });
             
             document.getElementById(tabId).classList.add('active');
-            document.querySelector(`.tab:nth-child(${tabId === 'document-tab' ? 1 : 2})`).classList.add('active');
+            document.querySelector(`.tab:nth-child(${tabId === 'chat-tab' ? 1 : 2})`).classList.add('active');
             
             if (tabId === 'chat-tab') {
                 loadKnowledgeBases();
