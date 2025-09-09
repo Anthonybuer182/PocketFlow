@@ -37,7 +37,12 @@ reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
 def init_db():
     conn = sqlite3.connect('data/knowledge_base.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS documents
+    
+    # 删除旧表（如果存在）
+    c.execute('DROP TABLE IF EXISTS documents')
+    
+    # 创建新表
+    c.execute('''CREATE TABLE documents
                  (id TEXT PRIMARY KEY,
                   filename TEXT,
                   original_filename TEXT,
@@ -67,6 +72,54 @@ def get_documents():
     documents = [dict(row) for row in c.fetchall()]
     conn.close()
     return documents
+
+# 获取单个文档信息
+def get_document(doc_id):
+    conn = sqlite3.connect('data/knowledge_base.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM documents WHERE id = ?", (doc_id,))
+    result = c.fetchone()
+    document = dict(result) if result else None
+    conn.close()
+    return document
+
+# 删除文档
+def delete_document(doc_id):
+    conn = sqlite3.connect('data/knowledge_base.db')
+    c = conn.cursor()
+    
+    # 获取文件名
+    c.execute("SELECT filename FROM documents WHERE id = ?", (doc_id,))
+    result = c.fetchone()
+    if result:
+        filename = result[0]
+        print(f"Deleting document {doc_id}, filename: {filename}")
+        
+        # 删除文件
+        file_path = f"static/uploads/{filename}"
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"Deleted file: {file_path}")
+        else:
+            print(f"File not found: {file_path}")
+        
+        # 删除向量数据库中的集合
+        try:
+            collection_name = f"doc_{doc_id}"
+            chroma_client.delete_collection(collection_name)
+            print(f"Deleted vector collection: {collection_name}")
+        except Exception as e:
+            print(f"Error deleting vector collection: {e}")
+        
+        # 删除数据库记录
+        c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+        conn.commit()
+        print(f"Deleted database record for: {doc_id}")
+    
+    conn.close()
+    print(f"Delete operation result: {result is not None}")
+    return result is not None
 
 # 文本分块函数
 def chunk_text(text, chunk_size=500, overlap=50):
@@ -219,6 +272,33 @@ async def add_document_api(file: UploadFile = File(...)):
 async def get_documents_api():
     documents = get_documents()
     return JSONResponse(content=documents)
+
+# 下载文档API
+@app.get("/api/documents/{doc_id}/download")
+async def download_document(doc_id: str):
+    document = get_document(doc_id)
+    if not document:
+        return JSONResponse(content={"status": "error", "message": "文档不存在"}, status_code=404)
+    
+    file_path = f"static/uploads/{document['filename']}"
+    if not os.path.exists(file_path):
+        return JSONResponse(content={"status": "error", "message": "文件不存在"}, status_code=404)
+    
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        path=file_path,
+        filename=document['original_filename'],
+        media_type='application/octet-stream'
+    )
+
+# 删除文档API
+@app.delete("/api/documents/{doc_id}")
+async def delete_document_api(doc_id: str):
+    success = delete_document(doc_id)
+    if success:
+        return JSONResponse(content={"status": "success", "message": "文档删除成功"})
+    else:
+        return JSONResponse(content={"status": "error", "message": "文档不存在"}, status_code=404)
 
 # WebSocket聊天连接
 @app.websocket("/ws/chat")

@@ -721,6 +721,32 @@
             gap: 5px;
         }
         
+        .upload-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .status-uploading {
+            background: rgba(76, 201, 240, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(76, 201, 240, 0.3);
+        }
+        
+        .status-completed {
+            background: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+            border: 1px solid rgba(40, 167, 69, 0.3);
+        }
+        
+        .status-error {
+            background: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+            border: 1px solid rgba(220, 53, 69, 0.3);
+        }
+        
         .document-actions {
             display: flex;
             gap: 12px;
@@ -904,6 +930,124 @@
         html {
             scroll-behavior: smooth;
         }
+        
+        /* 自定义弹框样式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 400px;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .modal-overlay.show .modal {
+            transform: translateY(0);
+        }
+        
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+        
+        .modal-body {
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .modal-icon {
+            font-size: 3rem;
+            color: var(--accent);
+            margin-bottom: 15px;
+        }
+        
+        .modal-message {
+            color: var(--dark);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        
+        .modal-footer {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            padding: 0 25px 25px;
+        }
+        
+        .modal-btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            min-width: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-btn-cancel {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+        
+        .modal-btn-cancel:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .modal-btn-confirm {
+            background: linear-gradient(135deg, var(--accent) 0%, #ff6b9d 100%);
+            color: white;
+        }
+        
+        .modal-btn-confirm:hover {
+            background: linear-gradient(135deg, #ff6b9d 0%, var(--accent) 100%);
+            transform: translateY(-2px);
+        }
+        
+        /* 文档名称高亮 */
+        .document-name-highlight {
+            font-weight: 600;
+            color: var(--accent);
+            background: rgba(247, 37, 133, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin: 0 2px;
+        }
     </style>
 </head>
 <body>
@@ -968,6 +1112,30 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认弹框 -->
+    <div id="delete-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> 确认删除</h3>
+            </div>
+            <div class="modal-body">
+                <div class="modal-icon">
+                    <i class="fas fa-trash-alt"></i>
+                </div>
+                <p class="modal-message">
+                    确定要删除文档 <span id="delete-document-name" class="document-name-highlight"></span> 吗？
+                </p>
+                <p class="modal-message" style="color: #6c757d; font-size: 0.9rem;">
+                    此操作不可恢复，所有相关的数据和向量索引都将被永久删除。
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-cancel" onclick="hideDeleteModal()">取消</button>
+                <button class="modal-btn modal-btn-confirm" onclick="confirmDelete()">确认删除</button>
             </div>
         </div>
     </div>
@@ -1058,6 +1226,7 @@
                     const uploadDate = new Date(doc.uploaded_at);
                     const documentItem = document.createElement('div');
                     documentItem.className = 'document-item';
+                    documentItem.setAttribute('data-doc-id', doc.id);
                     documentItem.innerHTML = `
                         <div class="document-icon">
                             <i class="fas fa-file-alt"></i>
@@ -1071,8 +1240,8 @@
                             </div>
                         </div>
                         <div class="document-actions">
-                            <button class="action-btn" title="下载"><i class="fas fa-download"></i></button>
-                            <button class="action-btn" title="删除"><i class="fas fa-trash"></i></button>
+                            <button class="action-btn" title="下载" onclick="downloadDocument('${doc.id}')"><i class="fas fa-download"></i></button>
+                            <button class="action-btn" title="删除" onclick="deleteDocument('${doc.id}')"><i class="fas fa-trash"></i></button>
                         </div>
                     `;
                     documentList.appendChild(documentItem);
@@ -1226,14 +1395,87 @@
             // 清空文件选择框，允许重复选择相同文件
             document.getElementById('file-input').value = '';
         }
+        
+        // 添加上传中的文档项
+        function addUploadingDocument(filename) {
+            const documentList = document.getElementById('document-list');
+            
+            // 移除空状态提示（如果有）
+            const emptyState = documentList.querySelector('.empty-state');
+            if (emptyState) {
+                documentList.removeChild(emptyState);
+            }
+            
+            const uploadId = 'upload-' + Date.now();
+            const documentItem = document.createElement('div');
+            documentItem.className = 'document-item';
+            documentItem.setAttribute('data-upload-id', uploadId);
+            documentItem.innerHTML = `
+                <div class="document-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="document-info">
+                    <div class="document-name">${filename}</div>
+                    <div class="document-meta">
+                        <span><i class="fas fa-clock"></i> 刚刚</span>
+                        <span class="upload-status status-uploading">
+                            <i class="fas fa-spinner fa-spin"></i> 上传中...
+                        </span>
+                    </div>
+                </div>
+                <div class="document-actions">
+                    <button class="action-btn" title="取消" onclick="cancelUpload('${uploadId}')"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+            
+            documentList.insertBefore(documentItem, documentList.firstChild);
+            return uploadId;
+        }
+        
+        // 更新上传状态
+        function updateUploadStatus(uploadId, status, message) {
+            const documentItem = document.querySelector(`[data-upload-id="${uploadId}"]`);
+            if (documentItem) {
+                const statusElement = documentItem.querySelector('.upload-status');
+                if (statusElement) {
+                    statusElement.className = `upload-status status-${status}`;
+                    statusElement.innerHTML = message;
+                    
+                    // 如果是完成状态，移除取消按钮
+                    if (status === 'completed') {
+                        const cancelBtn = documentItem.querySelector('.action-btn');
+                        if (cancelBtn) {
+                            cancelBtn.remove();
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 取消上传
+        function cancelUpload(uploadId) {
+            const documentItem = document.querySelector(`[data-upload-id="${uploadId}"]`);
+            if (documentItem) {
+                documentItem.remove();
+                
+                // 如果没有文档了，显示空状态
+                const documentList = document.getElementById('document-list');
+                if (documentList.children.length === 0) {
+                    showEmptyState();
+                }
+            }
+        }
 
         // 上传文件到服务器
         async function uploadFileToServer(file) {
             const formData = new FormData();
             formData.append('file', file);
             
+            // 创建上传ID并显示上传状态
+            const uploadId = addUploadingDocument(file.name);
+            
             try {
-                const response = await fetch('/api/upload_document', {
+                const response = await fetch('/api/documents', {
                     method: 'POST',
                     body: formData
                 });
@@ -1241,12 +1483,22 @@
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    // 重新加载文档列表（会同时更新聊天选择器和文档管理列表）
-                    loadDocuments();
+                    // 更新上传状态为完成
+                    updateUploadStatus(uploadId, 'completed', '<i class="fas fa-check"></i> 上传完成');
+                    
+                    // 延迟一会儿再重新加载文档列表，让用户看到完成状态
+                    setTimeout(() => {
+                        // 重新加载文档列表（会同时更新聊天选择器和文档管理列表）
+                        loadDocuments();
+                    }, 1000);
                 } else {
+                    // 更新上传状态为错误
+                    updateUploadStatus(uploadId, 'error', '<i class="fas fa-exclamation-triangle"></i> 上传失败');
                     console.error('文件上传失败:', result);
                 }
             } catch (error) {
+                // 更新上传状态为错误
+                updateUploadStatus(uploadId, 'error', '<i class="fas fa-exclamation-triangle"></i> 上传失败');
                 console.error('上传文件时出错:', error);
             }
         }
@@ -1271,6 +1523,216 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
+
+        // 下载文档
+        async function downloadDocument(docId) {
+            try {
+                // 打开新窗口下载文件
+                window.open(`/api/documents/${docId}/download`, '_blank');
+            } catch (error) {
+                console.error('下载文档失败:', error);
+                alert('下载文档失败，请稍后重试');
+            }
+        }
+
+        // 删除文档弹框变量
+        let currentDeleteDocId = null;
+        let currentDeleteDocName = null;
+
+        // 显示删除确认弹框
+        function showDeleteModal(docId, docName) {
+            currentDeleteDocId = docId;
+            currentDeleteDocName = docName;
+            
+            // 更新弹框内容
+            document.getElementById('delete-document-name').textContent = docName;
+            
+            // 显示弹框
+            const modal = document.getElementById('delete-modal');
+            modal.classList.add('show');
+            
+            // 禁用页面滚动
+            document.body.style.overflow = 'hidden';
+        }
+
+        // 隐藏删除确认弹框
+        function hideDeleteModal() {
+            const modal = document.getElementById('delete-modal');
+            modal.classList.remove('show');
+            
+            // 恢复页面滚动
+            document.body.style.overflow = '';
+            
+            // 清除当前文档信息
+            currentDeleteDocId = null;
+            currentDeleteDocName = null;
+        }
+
+        // 确认删除文档
+        async function confirmDelete() {
+            if (!currentDeleteDocId) return;
+            
+            try {
+                const response = await fetch(`/api/documents/${currentDeleteDocId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // 从界面中移除文档项
+                    const documentItem = document.querySelector(`.document-item[data-doc-id="${currentDeleteDocId}"]`);
+                    if (documentItem) {
+                        documentItem.remove();
+                    }
+                    
+                    // 从选择器中移除文档项
+                    const selectorItem = document.querySelector(`.document-selector-item[data-doc-id="${currentDeleteDocId}"]`);
+                    if (selectorItem) {
+                        selectorItem.remove();
+                    }
+                    
+                    // 如果没有文档了，显示空状态
+                    const documentList = document.getElementById('document-list');
+                    const docSelector = document.getElementById('document-selector');
+                    
+                    if (documentList.children.length === 0) {
+                        showEmptyState();
+                    }
+                    
+                    if (docSelector.children.length === 0) {
+                        docSelector.innerHTML = `
+                            <div class="empty-state">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <p>暂无文档，请先上传文档</p>
+                            </div>
+                        `;
+                    }
+                    
+                    // 显示成功提示
+                    showToast('文档删除成功', 'success');
+                } else {
+                    showToast('删除文档失败: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('删除文档失败:', error);
+                showToast('删除文档失败，请稍后重试', 'error');
+            } finally {
+                // 隐藏弹框
+                hideDeleteModal();
+            }
+        }
+
+        // 删除文档（触发弹框）
+        function deleteDocument(docId) {
+            // 获取文档名称
+            const documentItem = document.querySelector(`.document-item[data-doc-id="${docId}"]`);
+            if (!documentItem) return;
+            
+            const docName = documentItem.querySelector('.document-name').textContent;
+            
+            // 显示删除确认弹框
+            showDeleteModal(docId, docName);
+        }
+
+        // 显示Toast提示
+        function showToast(message, type = 'success') {
+            // 创建Toast元素
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `
+                <div class="toast-content">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // 添加到页面
+            document.body.appendChild(toast);
+            
+            // 显示动画
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            // 3秒后自动移除
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // 点击弹框外部关闭
+        document.getElementById('delete-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideDeleteModal();
+            }
+        });
+
+        // 添加Toast样式
+        const toastStyle = document.createElement('style');
+        toastStyle.textContent = `
+            .toast {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: white;
+                border-radius: var(--radius);
+                box-shadow: var(--shadow);
+                padding: 15px 20px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                z-index: 1001;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                border-left: 4px solid;
+            }
+            
+            .toast.show {
+                transform: translateX(0);
+            }
+            
+            .toast-success {
+                border-left-color: #28a745;
+            }
+            
+            .toast-error {
+                border-left-color: #dc3545;
+            }
+            
+            .toast-content {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .toast-success .toast-content i {
+                color: #28a745;
+            }
+            
+            .toast-error .toast-content i {
+                color: #dc3545;
+            }
+            
+            @media (max-width: 768px) {
+                .toast {
+                    top: 10px;
+                    right: 10px;
+                    left: 10px;
+                    transform: translateY(-100%);
+                }
+                
+                .toast.show {
+                    transform: translateY(0);
+                }
+            }
+        `;
+        document.head.appendChild(toastStyle);
     </script>
 </body>
 </html>
