@@ -459,11 +459,69 @@
         }
         
         .kb-selector-item {
-            padding: 10px 0;
+            padding: 12px 0;
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        
+        .kb-selector-item:hover {
+            background: rgba(110, 142, 251, 0.05);
+            padding-left: 8px;
+            padding-right: 8px;
+            margin: 0 -8px;
+            border-radius: 8px;
+        }
+        
+        .kb-selector-item:last-child {
+            border-bottom: none;
+        }
+        
+        .document-selector-item {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        
+        .document-selector-item:hover {
+            background: rgba(110, 142, 251, 0.05);
+            padding-left: 8px;
+            padding-right: 8px;
+            margin: 0 -8px;
+            border-radius: 8px;
+        }
+        
+        .document-selector-item:last-child {
+            border-bottom: none;
+        }
+        
+        .document-selector-item.selected {
+            background: rgba(110, 142, 251, 0.1);
+            border-left: 4px solid var(--primary);
+        }
+        
+        .document-selector-item label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--dark);
+            flex: 1;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            height: 100%;
+        }
+        
+        .document-selector-item.selected label {
+            color: var(--primary);
+            font-weight: 600;
         }
         
         .kb-selector-item:last-child {
@@ -895,15 +953,15 @@
                         <p>您好！我是AI助手，请问有什么可以帮助您的？</p>
                     </div>
                 </div>
-                <div class="chat-input">
+                    <div class="chat-input">
                     <div class="kb-selector">
-                        <div class="kb-selector-icon-btn" onclick="toggleKnowledgeBaseSelector()">
+                        <div class="kb-selector-icon-btn" onclick="toggleDocumentSelector()">
                             <i class="fas fa-book"></i>
                         </div>
                     </div>
                     <input type="text" id="message-input" placeholder="输入您的问题..." onkeypress="handleKeyPress(event)">
                     <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i> 发送</button>
-                    <div id="knowledge-base-selector" class="kb-selector-content">
+                    <div id="document-selector" class="kb-selector-content">
                         <div class="empty-state">
                             <i class="fas fa-spinner fa-spin"></i>
                             <p>加载中...</p>
@@ -919,7 +977,7 @@
 
         // 初始化页面
         document.addEventListener('DOMContentLoaded', function() {
-            loadKnowledgeBases();
+            loadDocuments();
             initWebSocket();
             initDocumentUpload();
         });
@@ -937,53 +995,101 @@
             document.querySelector(`.tab:nth-child(${tabId === 'chat-tab' ? 1 : 2})`).classList.add('active');
             
             if (tabId === 'chat-tab') {
-                loadKnowledgeBases();
+                loadDocuments();
             }
         }
 
-        // 加载知识库列表
-        async function loadKnowledgeBases() {
+        // 加载文档列表
+        async function loadDocuments() {
             try {
-                const response = await fetch('/api/knowledge_bases');
-                const knowledgeBases = await response.json();
+                const response = await fetch('/api/documents');
+                const documents = await response.json();
                 
-                // 更新聊天页面的知识库选择器
-                const kbSelector = document.getElementById('knowledge-base-selector');
-                if (knowledgeBases.length === 0) {
-                    kbSelector.innerHTML = `
+                // 更新聊天页面的文档选择器
+                const docSelector = document.getElementById('document-selector');
+                if (documents.length === 0) {
+                    docSelector.innerHTML = `
                         <div class="empty-state">
                             <i class="fas fa-exclamation-circle"></i>
-                            <p>暂无知识库，请先创建知识库</p>
+                            <p>暂无文档，请先上传文档</p>
                         </div>
                     `;
                 } else {
-                    kbSelector.innerHTML = '';
-                    knowledgeBases.forEach(kb => {
-                        const kbItem = document.createElement('div');
-                        kbItem.className = 'kb-selector-item';
-                        kbItem.innerHTML = `
-                            <input type="checkbox" id="selector-kb-${kb.id}" value="${kb.id}">
-                            <label for="selector-kb-${kb.id}">${kb.name}</label>
+                    docSelector.innerHTML = '';
+                    documents.forEach(doc => {
+                        const docItem = document.createElement('div');
+                        docItem.className = 'document-selector-item';
+                        docItem.setAttribute('data-doc-id', doc.id);
+                        docItem.innerHTML = `
+                            <label>${doc.original_filename}</label>
                         `;
-                        kbSelector.appendChild(kbItem);
+                        
+                        // 添加点击事件
+                        docItem.addEventListener('click', function() {
+                            this.classList.toggle('selected');
+                        });
+                        
+                        docSelector.appendChild(docItem);
                     });
                 }
                 
+                // 更新文档管理页面的文档列表
+                updateDocumentList(documents);
+                
             } catch (error) {
-                console.error('加载知识库失败:', error);
+                console.error('加载文档失败:', error);
+            }
+        }
+
+        // 更新文档管理页面的文档列表
+        function updateDocumentList(documents) {
+            const documentList = document.getElementById('document-list');
+            
+            if (documents.length === 0) {
+                documentList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>暂无文档，请上传文件</p>
+                    </div>
+                `;
+            } else {
+                documentList.innerHTML = '';
+                documents.forEach(doc => {
+                    const uploadDate = new Date(doc.uploaded_at);
+                    const documentItem = document.createElement('div');
+                    documentItem.className = 'document-item';
+                    documentItem.innerHTML = `
+                        <div class="document-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="document-info">
+                            <div class="document-name">${doc.original_filename}</div>
+                            <div class="document-meta">
+                                <span><i class="fas fa-calendar"></i> ${uploadDate.toLocaleDateString()}</span>
+                                <span><i class="fas fa-clock"></i> ${uploadDate.toLocaleTimeString()}</span>
+                                <span><i class="fas fa-database"></i> ${doc.id.substring(0, 8)}</span>
+                            </div>
+                        </div>
+                        <div class="document-actions">
+                            <button class="action-btn" title="下载"><i class="fas fa-download"></i></button>
+                            <button class="action-btn" title="删除"><i class="fas fa-trash"></i></button>
+                        </div>
+                    `;
+                    documentList.appendChild(documentItem);
+                });
             }
         }
 
 
-        // 显示/隐藏知识库选择器
-        function toggleKnowledgeBaseSelector() {
-            const selector = document.getElementById('knowledge-base-selector');
+        // 显示/隐藏文档选择器
+        function toggleDocumentSelector() {
+            const selector = document.getElementById('document-selector');
             selector.classList.toggle('show');
         }
 
         // 点击外部关闭选择器
         window.addEventListener('click', function(e) {
-            const selector = document.getElementById('knowledge-base-selector');
+            const selector = document.getElementById('document-selector');
             const selectorBtn = document.querySelector('.kb-selector-icon-btn');
             if (!selector.contains(e.target) && !selectorBtn.contains(e.target)) {
                 selector.classList.remove('show');
@@ -1135,65 +1241,14 @@
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    addDocumentToList({
-                        name: file.name,
-                        size: formatFileSize(file.size),
-                        date: new Date().toLocaleDateString(),
-                        time: new Date().toLocaleTimeString()
-                    });
-                    
-                    // 重新加载知识库列表
-                    loadKnowledgeBases();
+                    // 重新加载文档列表（会同时更新聊天选择器和文档管理列表）
+                    loadDocuments();
                 } else {
                     console.error('文件上传失败:', result);
                 }
             } catch (error) {
                 console.error('上传文件时出错:', error);
             }
-        }
-
-        // 添加文档到列表
-        function addDocumentToList(doc) {
-            const documentList = document.getElementById('document-list');
-            
-            // 移除空状态提示（如果有）
-            const emptyState = documentList.querySelector('.empty-state');
-            if (emptyState) {
-                documentList.removeChild(emptyState);
-            }
-            
-            const documentItem = document.createElement('div');
-            documentItem.className = 'document-item';
-            documentItem.innerHTML = `
-                <div class="document-icon">
-                    <i class="fas fa-file-alt"></i>
-                </div>
-                <div class="document-info">
-                    <div class="document-name">${doc.name}</div>
-                    <div class="document-meta">
-                        <span><i class="fas fa-calendar"></i> ${doc.date}</span>
-                        <span><i class="fas fa-clock"></i> ${doc.time}</span>
-                        <span><i class="fas fa-weight-hanging"></i> ${doc.size}</span>
-                    </div>
-                </div>
-                <div class="document-actions">
-                    <button class="action-btn" title="下载"><i class="fas fa-download"></i></button>
-                    <button class="action-btn" title="删除"><i class="fas fa-trash"></i></button>
-                </div>
-            `;
-            
-            // 添加删除功能
-            const deleteBtn = documentItem.querySelector('.action-btn:last-child');
-            deleteBtn.addEventListener('click', function() {
-                documentList.removeChild(documentItem);
-                
-                // 如果没有文档了，显示空状态
-                if (documentList.children.length === 0) {
-                    showEmptyState();
-                }
-            });
-            
-            documentList.appendChild(documentItem);
         }
 
         // 显示空状态
