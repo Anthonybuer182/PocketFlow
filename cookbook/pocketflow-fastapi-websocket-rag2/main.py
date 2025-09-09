@@ -300,6 +300,74 @@ async def delete_document_api(doc_id: str):
     else:
         return JSONResponse(content={"status": "error", "message": "文档不存在"}, status_code=404)
 
+# 搜索文档内容API
+@app.post("/api/documents/{doc_id}/search")
+async def search_document_api(doc_id: str, request: Request):
+    # 检查文档是否存在
+    document = get_document(doc_id)
+    if not document:
+        return JSONResponse(content={"status": "error", "message": "文档不存在"}, status_code=404)
+    
+    # 解析请求体
+    try:
+        body = await request.json()
+        query = body.get("query", "").strip()
+        if not query:
+            return JSONResponse(content={"status": "error", "message": "搜索关键词不能为空"}, status_code=400)
+    except:
+        return JSONResponse(content={"status": "error", "message": "无效的请求格式"}, status_code=400)
+    
+    try:
+        # 获取文档对应的向量集合
+        collection_name = f"doc_{doc_id}"
+        collection = chroma_client.get_collection(collection_name)
+        
+        # 使用嵌入模型进行语义搜索
+        query_embedding = embedding_model.encode([query]).tolist()
+        
+        # 查询向量数据库
+        results = collection.query(
+            query_embeddings=query_embedding,
+            n_results=20,  # 获取更多结果用于重排
+            include=["documents", "distances", "metadatas"]
+        )
+        
+        # 处理搜索结果
+        search_results = []
+        if results and results['documents']:
+            for i, doc_list in enumerate(results['documents']):
+                for j, document_text in enumerate(doc_list):
+                    # 计算相似度分数（将距离转换为相似度，0-1范围）
+                    distance = results['distances'][i][j]
+                    similarity_score = 1 - distance  # 距离越小，相似度越高
+                    
+                    # 获取元数据
+                    metadata = results['metadatas'][i][j] if results['metadatas'] else {}
+                    page = metadata.get("page", 1)
+                    
+                    search_results.append({
+                        "content": document_text,
+                        "score": similarity_score,
+                        "page": page,
+                        "metadata": metadata
+                    })
+        
+        # 按分数排序（从高到低）
+        search_results.sort(key=lambda x: x["score"], reverse=True)
+        
+        return JSONResponse(content={
+            "status": "success",
+            "data": search_results,
+            "document_name": document['original_filename']
+        })
+        
+    except Exception as e:
+        print(f"搜索文档时出错: {e}")
+        return JSONResponse(content={
+            "status": "error", 
+            "message": f"搜索失败: {str(e)}"
+        }, status_code=500)
+
 # WebSocket聊天连接
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):

@@ -1048,6 +1048,129 @@
             border-radius: 4px;
             margin: 0 2px;
         }
+
+        /* 搜索弹框样式 */
+        .search-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(110, 142, 251, 0.15);
+        }
+        
+        .search-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(110, 142, 251, 0.3);
+        }
+        
+        .search-results {
+            max-height: 300px;
+            overflow-y: auto;
+            overflow-x: hidden;  /* 禁止横向滚动 */
+            margin-top: 20px;
+        }
+        
+        .search-result-item {
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--primary);
+            transition: all 0.3s ease;
+        }
+        
+        .search-result-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .search-result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .search-result-score {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .search-result-content {
+            color: #495057;
+            line-height: 1.5;
+            font-size: 0.9rem;
+        }
+        
+        .search-result-meta {
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .search-loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .search-loading i {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+        
+        .search-no-results {
+            text-align: center;
+            padding: 30px;
+            color: #6c757d;
+        }
+        
+        .search-no-results i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #adb5bd;
+        }
+        
+        /* 搜索关键词高亮 */
+        .search-highlight {
+            background: linear-gradient(135deg, rgba(247, 37, 133, 0.2) 0%, rgba(255, 107, 157, 0.2) 100%);
+            color: var(--accent);
+            font-weight: 600;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
     </style>
 </head>
 <body>
@@ -1136,6 +1259,32 @@
             <div class="modal-footer">
                 <button class="modal-btn modal-btn-cancel" onclick="hideDeleteModal()">取消</button>
                 <button class="modal-btn modal-btn-confirm" onclick="confirmDelete()">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜索弹框 -->
+    <div id="search-modal" class="modal-overlay">
+        <div class="modal" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-search"></i> 搜索文档内容</h3>
+            </div>
+            <div class="modal-body">
+                <div class="search-input-container">
+                    <input type="text" id="search-query" placeholder="输入搜索关键词..." class="search-input" onkeypress="handleSearchKeyPress(event)">
+                    <button class="search-btn" onclick="performSearch()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div id="search-results" class="search-results">
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <p>请输入关键词搜索文档内容</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-cancel" onclick="hideSearchModal()">关闭</button>
             </div>
         </div>
     </div>
@@ -1240,6 +1389,7 @@
                             </div>
                         </div>
                         <div class="document-actions">
+                            <button class="action-btn" title="搜索" onclick="searchDocument('${doc.id}', '${doc.original_filename}')"><i class="fas fa-search"></i></button>
                             <button class="action-btn" title="下载" onclick="downloadDocument('${doc.id}')"><i class="fas fa-download"></i></button>
                             <button class="action-btn" title="删除" onclick="deleteDocument('${doc.id}')"><i class="fas fa-trash"></i></button>
                         </div>
@@ -1670,6 +1820,169 @@
         document.getElementById('delete-modal').addEventListener('click', function(e) {
             if (e.target === this) {
                 hideDeleteModal();
+            }
+        });
+
+        // 搜索弹框变量
+        let currentSearchDocId = null;
+        let currentSearchDocName = null;
+
+        // 显示搜索弹框
+        function showSearchModal(docId, docName) {
+            currentSearchDocId = docId;
+            currentSearchDocName = docName;
+            
+            // 更新弹框标题
+            document.querySelector('#search-modal .modal-header h3').innerHTML = 
+                `<i class="fas fa-search"></i> 搜索文档内容 - ${docName}`;
+            
+            // 清空搜索框和结果
+            document.getElementById('search-query').value = '';
+            document.getElementById('search-results').innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-search"></i>
+                    <p>请输入关键词搜索文档内容</p>
+                </div>
+            `;
+            
+            // 显示弹框
+            const modal = document.getElementById('search-modal');
+            modal.classList.add('show');
+            
+            // 禁用页面滚动
+            document.body.style.overflow = 'hidden';
+            
+            // 聚焦到搜索框
+            setTimeout(() => {
+                document.getElementById('search-query').focus();
+            }, 100);
+        }
+
+        // 隐藏搜索弹框
+        function hideSearchModal() {
+            const modal = document.getElementById('search-modal');
+            modal.classList.remove('show');
+            
+            // 恢复页面滚动
+            document.body.style.overflow = '';
+            
+            // 清除当前文档信息
+            currentSearchDocId = null;
+            currentSearchDocName = null;
+        }
+
+        // 处理搜索按键事件
+        function handleSearchKeyPress(event) {
+            if (event.key === 'Enter') {
+                performSearch();
+            }
+        }
+
+        // 执行搜索
+        async function performSearch() {
+            const query = document.getElementById('search-query').value.trim();
+            
+            if (!query) {
+                showToast('请输入搜索关键词', 'error');
+                return;
+            }
+            
+            if (!currentSearchDocId) {
+                showToast('未选择文档', 'error');
+                return;
+            }
+            
+            // 显示加载状态
+            document.getElementById('search-results').innerHTML = `
+                <div class="search-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>正在搜索...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/api/documents/${currentSearchDocId}/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                
+                const results = await response.json();
+                
+                if (results.status === 'success' && results.data && results.data.length > 0) {
+                    // 按分数排序（从高到低）
+                    results.data.sort((a, b) => b.score - a.score);
+                    
+                    // 显示搜索结果
+                    displaySearchResults(results.data, query);
+                } else {
+                    // 显示无结果
+                    document.getElementById('search-results').innerHTML = `
+                        <div class="search-no-results">
+                            <i class="fas fa-search"></i>
+                            <p>未找到相关结果</p>
+                            <p style="color: #adb5bd; font-size: 0.9rem; margin-top: 10px;">
+                                请尝试使用其他关键词搜索
+                            </p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('搜索失败:', error);
+                document.getElementById('search-results').innerHTML = `
+                    <div class="search-no-results">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>搜索失败，请稍后重试</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 显示搜索结果
+        function displaySearchResults(results, query) {
+            const resultsContainer = document.getElementById('search-results');
+            resultsContainer.innerHTML = '';
+            
+            results.forEach((result, index) => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'search-result-item';
+                
+                // 高亮搜索关键词
+                let highlightedContent = result.content;
+                if (query) {
+                    const regex = new RegExp(query, 'gi');
+                    highlightedContent = highlightedContent.replace(regex, 
+                        match => `<span class="search-highlight">${match}</span>`
+                    );
+                }
+                
+                resultItem.innerHTML = `
+                    <div class="search-result-header">
+                        <strong>结果 ${index + 1}</strong>
+                        <span class="search-result-score">${(result.score * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="search-result-content">${highlightedContent}</div>
+                    <div class="search-result-meta">
+                        <span><i class="fas fa-file-alt"></i> 第 ${result.page || 1} 页</span>
+                        <span><i class="fas fa-ruler"></i> ${result.content.length} 字符</span>
+                    </div>
+                `;
+                
+                resultsContainer.appendChild(resultItem);
+            });
+        }
+
+        // 搜索文档
+        function searchDocument(docId, docName) {
+            showSearchModal(docId, docName);
+        }
+
+        // 点击搜索弹框外部关闭
+        document.getElementById('search-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideSearchModal();
             }
         });
 
