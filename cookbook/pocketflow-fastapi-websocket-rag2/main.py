@@ -39,7 +39,6 @@ def init_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS documents
                  (id TEXT PRIMARY KEY,
-                  kb_id TEXT,
                   filename TEXT,
                   original_filename TEXT,
                   uploaded_at TIMESTAMP)''')
@@ -49,22 +48,22 @@ def init_db():
 init_db()
 
 # 添加文档记录
-def add_document(kb_id, filename, original_filename):
+def add_document(filename, original_filename):
     conn = sqlite3.connect('data/knowledge_base.db')
     c = conn.cursor()
     doc_id = str(uuid.uuid4())
-    c.execute("INSERT INTO documents (id, kb_id, filename, original_filename, uploaded_at) VALUES (?, ?, ?, ?, ?)",
-              (doc_id, kb_id, filename, original_filename, datetime.now()))
+    c.execute("INSERT INTO documents (id, filename, original_filename, uploaded_at) VALUES (?, ?, ?, ?)",
+              (doc_id, filename, original_filename, datetime.now()))
     conn.commit()
     conn.close()
     return doc_id
 
-# 获取知识库中的文档
-def get_documents(kb_id):
+# 获取所有文档
+def get_documents():
     conn = sqlite3.connect('data/knowledge_base.db')
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM documents WHERE kb_id = ? ORDER BY uploaded_at DESC", (kb_id,))
+    c.execute("SELECT * FROM documents ORDER BY uploaded_at DESC")
     documents = [dict(row) for row in c.fetchall()]
     conn.close()
     return documents
@@ -80,9 +79,9 @@ def chunk_text(text, chunk_size=500, overlap=50):
     return chunks
 
 # 存储文档到向量数据库
-def store_document_in_vector_db(kb_id, doc_id, text):
+def store_document_in_vector_db(doc_id, text):
     # 获取或创建集合
-    collection_name = f"kb_{kb_id}"
+    collection_name = f"doc_{doc_id}"
     try:
         collection = chroma_client.get_collection(collection_name)
     except:
@@ -107,12 +106,12 @@ def store_document_in_vector_db(kb_id, doc_id, text):
     )
 
 # 多路召回检索
-def multi_retrieval(query, kb_ids, top_k=5):
+def multi_retrieval(query, doc_ids, top_k=5):
     results = []
     
-    for kb_id in kb_ids:
+    for doc_id in doc_ids:
         try:
-            collection = chroma_client.get_collection(f"kb_{kb_id}")
+            collection = chroma_client.get_collection(f"doc_{doc_id}")
             
             # 方法1: 基于嵌入相似度
             query_embedding = embedding_model.encode([query]).tolist()
@@ -135,31 +134,31 @@ def multi_retrieval(query, kb_ids, top_k=5):
             if embedding_results['documents']:
                 for i, doc_list in enumerate(embedding_results['documents']):
                     for j, doc in enumerate(doc_list):
-                        doc_id = embedding_results['ids'][i][j]
-                        if doc_id not in seen_ids:
+                        chunk_id = embedding_results['ids'][i][j]
+                        if chunk_id not in seen_ids:
                             combined_docs.append({
                                 "text": doc,
                                 "score": 1 - embedding_results['distances'][i][j],  # 转换为相似度分数
-                                "source": f"嵌入相似度 (知识库: {kb_id})"
+                                "source": f"嵌入相似度 (文档: {doc_id})"
                             })
-                            seen_ids.add(doc_id)
+                            seen_ids.add(chunk_id)
             
             # 处理文本检索结果
             if text_results['documents']:
                 for i, doc_list in enumerate(text_results['documents']):
                     for j, doc in enumerate(doc_list):
-                        doc_id = text_results['ids'][i][j]
-                        if doc_id not in seen_ids:
+                        chunk_id = text_results['ids'][i][j]
+                        if chunk_id not in seen_ids:
                             combined_docs.append({
                                 "text": doc,
                                 "score": text_results['distances'][i][j],  # 这里可能是相似度分数
-                                "source": f"文本相似度 (知识库: {kb_id})"
+                                "source": f"文本相似度 (文档: {doc_id})"
                             })
-                            seen_ids.add(doc_id)
+                            seen_ids.add(chunk_id)
             
             results.extend(combined_docs)
         except Exception as e:
-            print(f"检索知识库 {kb_id} 时出错: {e}")
+            print(f"检索文档 {doc_id} 时出错: {e}")
             continue
     
     return results
@@ -191,7 +190,7 @@ async def read_root(request: Request):
 
 # 添加文档API
 @app.post("/api/documents")
-async def add_document_api(kb_id: str = Form(...), file: UploadFile = File(...)):
+async def add_document_api(file: UploadFile = File(...)):
     # 保存文件
     file_ext = os.path.splitext(file.filename)[1]
     filename = f"{uuid.uuid4()}{file_ext}"
@@ -202,7 +201,7 @@ async def add_document_api(kb_id: str = Form(...), file: UploadFile = File(...))
         f.write(content)
     
     # 添加到数据库
-    doc_id = add_document(kb_id, filename, file.filename)
+    doc_id = add_document(filename, file.filename)
     
     # 读取文件内容 (这里简化处理，实际应该根据文件类型解析)
     try:
@@ -211,14 +210,14 @@ async def add_document_api(kb_id: str = Form(...), file: UploadFile = File(...))
         text = str(content)
     
     # 存储到向量数据库
-    store_document_in_vector_db(kb_id, doc_id, text)
+    store_document_in_vector_db(doc_id, text)
     
-    return JSONResponse(content={"status": "success", "doc_id": doc_id, "kb_id": kb_id})
+    return JSONResponse(content={"status": "success", "doc_id": doc_id})
 
 # 获取文档列表API
-@app.get("/api/documents/{kb_id}")
-async def get_documents_api(kb_id: str):
-    documents = get_documents(kb_id)
+@app.get("/api/documents")
+async def get_documents_api():
+    documents = get_documents()
     return JSONResponse(content=documents)
 
 # WebSocket聊天连接
@@ -231,13 +230,13 @@ async def websocket_endpoint(websocket: WebSocket):
             
             if data['type'] == 'message':
                 message = data['message']
-                selected_kbs = data.get('selected_kbs', [])
+                selected_docs = data.get('selected_docs', [])
                 
-                # 从选定的知识库中检索相关内容
+                # 从选定的文档中检索相关内容
                 context = ""
-                if selected_kbs:
+                if selected_docs:
                     # 多路召回检索
-                    retrieved_docs = multi_retrieval(message, selected_kbs, top_k=10)
+                    retrieved_docs = multi_retrieval(message, selected_docs, top_k=10)
                     
                     # 重排检索结果
                     reranked_docs = rerank_results(message, retrieved_docs, top_k=5)
@@ -247,7 +246,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     await websocket.send_json({
                         "type": "context",
-                        "context": f"已从 {len(selected_kbs)} 个知识库中检索到 {len(reranked_docs)} 条相关信息"
+                        "context": f"已从 {len(selected_docs)} 个文档中检索到 {len(reranked_docs)} 条相关信息"
                     })
                 
                 # 模拟LLM生成回复 (实际应用中应调用真实的LLM API)
