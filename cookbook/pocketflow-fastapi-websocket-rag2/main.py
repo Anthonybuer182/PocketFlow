@@ -224,7 +224,7 @@ async def get_kbs():
 
 # 上传文档API
 @app.post("/api/upload_document")
-async def upload_document(kb_id: str = Form(...), file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...)):
     # 保存文件
     file_ext = os.path.splitext(file.filename)[1]
     filename = f"{uuid.uuid4()}{file_ext}"
@@ -233,6 +233,11 @@ async def upload_document(kb_id: str = Form(...), file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         content = await file.read()
         f.write(content)
+    
+    # 基于文件名自动创建知识库
+    kb_name = os.path.splitext(file.filename)[0]  # 使用文件名作为知识库名称
+    kb_description = f"知识库来自文件: {file.filename}"
+    kb_id = add_knowledge_base(kb_name, kb_description)
     
     # 添加到数据库
     doc_id = add_document(kb_id, filename, file.filename)
@@ -246,13 +251,7 @@ async def upload_document(kb_id: str = Form(...), file: UploadFile = File(...)):
     # 存储到向量数据库
     store_document_in_vector_db(kb_id, doc_id, text)
     
-    return JSONResponse(content={"status": "success", "doc_id": doc_id})
-
-# 创建知识库API
-@app.post("/api/create_kb")
-async def create_kb(name: str = Form(...), description: str = Form(...)):
-    kb_id = add_knowledge_base(name, description)
-    return JSONResponse(content={"status": "success", "kb_id": kb_id})
+    return JSONResponse(content={"status": "success", "doc_id": doc_id, "kb_id": kb_id})
 
 # WebSocket聊天连接
 @app.websocket("/ws/chat")

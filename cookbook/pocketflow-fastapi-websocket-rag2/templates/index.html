@@ -1113,18 +1113,43 @@
                 const file = files[i];
                 console.log('上传文件:', file.name);
                 
-                // 这里应该添加上传到服务器的代码
-                // 模拟上传成功后的操作
-                addDocumentToList({
-                    name: file.name,
-                    size: formatFileSize(file.size),
-                    date: new Date().toLocaleDateString(),
-                    time: new Date().toLocaleTimeString()
-                });
+                // 上传文件到服务器
+                uploadFileToServer(file);
             }
             
             // 清空文件选择框，允许重复选择相同文件
             document.getElementById('file-input').value = '';
+        }
+
+        // 上传文件到服务器
+        async function uploadFileToServer(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/upload_document', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    addDocumentToList({
+                        name: file.name,
+                        size: formatFileSize(file.size),
+                        date: new Date().toLocaleDateString(),
+                        time: new Date().toLocaleTimeString()
+                    });
+                    
+                    // 重新加载知识库列表
+                    loadKnowledgeBases();
+                } else {
+                    console.error('文件上传失败:', result);
+                }
+            } catch (error) {
+                console.error('上传文件时出错:', error);
+            }
         }
 
         // 添加文档到列表
