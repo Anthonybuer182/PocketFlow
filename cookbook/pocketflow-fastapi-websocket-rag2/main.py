@@ -37,43 +37,16 @@ reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
 def init_db():
     conn = sqlite3.connect('data/knowledge_base.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS knowledge_bases
-                 (id TEXT PRIMARY KEY, 
-                  name TEXT, 
-                  description TEXT,
-                  created_at TIMESTAMP)''')
     c.execute('''CREATE TABLE IF NOT EXISTS documents
                  (id TEXT PRIMARY KEY,
                   kb_id TEXT,
                   filename TEXT,
                   original_filename TEXT,
-                  uploaded_at TIMESTAMP,
-                  FOREIGN KEY (kb_id) REFERENCES knowledge_bases (id))''')
+                  uploaded_at TIMESTAMP)''')
     conn.commit()
     conn.close()
 
 init_db()
-
-# 获取知识库列表
-def get_knowledge_bases():
-    conn = sqlite3.connect('data/knowledge_base.db')
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM knowledge_bases ORDER BY created_at DESC")
-    knowledge_bases = [dict(row) for row in c.fetchall()]
-    conn.close()
-    return knowledge_bases
-
-# 添加知识库
-def add_knowledge_base(name, description):
-    conn = sqlite3.connect('data/knowledge_base.db')
-    c = conn.cursor()
-    kb_id = str(uuid.uuid4())
-    c.execute("INSERT INTO knowledge_bases (id, name, description, created_at) VALUES (?, ?, ?, ?)",
-              (kb_id, name, description, datetime.now()))
-    conn.commit()
-    conn.close()
-    return kb_id
 
 # 添加文档记录
 def add_document(kb_id, filename, original_filename):
@@ -216,15 +189,9 @@ def rerank_results(query, retrieved_docs, top_k=5):
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# 获取知识库列表API
-@app.get("/api/knowledge_bases")
-async def get_kbs():
-    knowledge_bases = get_knowledge_bases()
-    return JSONResponse(content=knowledge_bases)
-
-# 上传文档API
-@app.post("/api/upload_document")
-async def upload_document(file: UploadFile = File(...)):
+# 添加文档API
+@app.post("/api/documents")
+async def add_document_api(kb_id: str = Form(...), file: UploadFile = File(...)):
     # 保存文件
     file_ext = os.path.splitext(file.filename)[1]
     filename = f"{uuid.uuid4()}{file_ext}"
@@ -233,11 +200,6 @@ async def upload_document(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         content = await file.read()
         f.write(content)
-    
-    # 基于文件名自动创建知识库
-    kb_name = os.path.splitext(file.filename)[0]  # 使用文件名作为知识库名称
-    kb_description = f"知识库来自文件: {file.filename}"
-    kb_id = add_knowledge_base(kb_name, kb_description)
     
     # 添加到数据库
     doc_id = add_document(kb_id, filename, file.filename)
@@ -252,6 +214,12 @@ async def upload_document(file: UploadFile = File(...)):
     store_document_in_vector_db(kb_id, doc_id, text)
     
     return JSONResponse(content={"status": "success", "doc_id": doc_id, "kb_id": kb_id})
+
+# 获取文档列表API
+@app.get("/api/documents/{kb_id}")
+async def get_documents_api(kb_id: str):
+    documents = get_documents(kb_id)
+    return JSONResponse(content=documents)
 
 # WebSocket聊天连接
 @app.websocket("/ws/chat")
