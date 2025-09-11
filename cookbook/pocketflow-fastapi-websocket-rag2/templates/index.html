@@ -1215,10 +1215,6 @@
         <div id="chat-tab" class="tab-content active">
             <div class="chat-container">
                 <div id="chat-messages" class="chat-messages">
-                    <div class="message bot-message">
-                        <strong>AI助手</strong>
-                        <p>您好！我是AI助手，请问有什么可以帮助您的？</p>
-                    </div>
                 </div>
                     <div class="chat-input">
                     <div class="kb-selector">
@@ -1429,8 +1425,15 @@
             
             websocket.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                if (data.type === 'response') {
-                    addMessage(data.message, 'bot');
+                if (data.type === 'response_start') {
+                    // 开始新的响应消息
+                    startBotMessage();
+                } else if (data.type === 'response_chunk') {
+                    // 添加响应片段
+                    appendBotMessageChunk(data.chunk);
+                } else if (data.type === 'response_end') {
+                    // 完成响应消息
+                    completeBotMessage(data.full_response);
                 } else if (data.type === 'context') {
                     addContextMessage(data.context);
                 }
@@ -1496,6 +1499,57 @@
             messageElement.innerHTML = `<i class="fas fa-info-circle"></i> ${text}`;
             messagesContainer.appendChild(messageElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 开始新的机器人消息（流式响应）
+        function startBotMessage() {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageId = 'streaming-message-' + Date.now();
+            const contentId = 'streaming-content-' + Date.now();
+            
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message bot-message';
+            messageElement.id = messageId;
+            messageElement.innerHTML = `
+                <strong>AI助手</strong>
+                <p id="${contentId}"></p>
+            `;
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // 存储当前消息ID用于后续操作
+            window.currentStreamingMessage = {
+                messageId: messageId,
+                contentId: contentId
+            };
+        }
+
+        // 添加机器人消息片段（流式响应）
+        function appendBotMessageChunk(chunk) {
+            if (window.currentStreamingMessage) {
+                const contentElement = document.getElementById(window.currentStreamingMessage.contentId);
+                if (contentElement) {
+                    contentElement.textContent += chunk;
+                    const messagesContainer = document.getElementById('chat-messages');
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            }
+        }
+
+        // 完成机器人消息（流式响应）
+        function completeBotMessage(fullResponse) {
+            if (window.currentStreamingMessage) {
+                const messageElement = document.getElementById(window.currentStreamingMessage.messageId);
+                if (messageElement) {
+                    messageElement.removeAttribute('id');
+                    const contentElement = messageElement.querySelector('p');
+                    if (contentElement) {
+                        contentElement.textContent = fullResponse;
+                    }
+                }
+                // 清除当前消息引用
+                window.currentStreamingMessage = null;
+            }
         }
 
         // 初始化文档上传功能

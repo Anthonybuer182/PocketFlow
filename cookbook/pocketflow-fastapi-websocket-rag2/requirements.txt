@@ -8,4 +8,5 @@ aiofiles==23.2.1
 jinja2==3.1.2
 python-dotenv==1.0.0
 openai==1.102.0
+aiohttp==3.9.5
 pocketflow

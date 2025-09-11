@@ -13,6 +13,7 @@ from typing import List, Optional
 import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer, CrossEncoder
+from utils.stream_llm import stream_llm
 
 # 初始化应用
 app = FastAPI(title="RAG Demo")
@@ -397,24 +398,34 @@ async def websocket_endpoint(websocket: WebSocket):
                         "context": f"已从 {len(selected_docs)} 个文档中检索到 {len(reranked_docs)} 条相关信息"
                     })
                 
-                # 模拟LLM生成回复 (实际应用中应调用真实的LLM API)
-                response_text = generate_response(message, context)
+                # 使用OpenAI API流式生成回复
+                messages = []
+                if context:
+                    messages.append({"role": "system", "content": f"基于以下上下文信息回答问题：\n\n{context}\n\n请根据上下文提供准确、相关的回答。"})
+                messages.append({"role": "user", "content": message})
                 
+                # 发送开始响应消息
                 await websocket.send_json({
-                    "type": "response",
-                    "message": response_text
+                    "type": "response_start"
+                })
+                
+                # 流式返回响应
+                full_response = ""
+                async for chunk in stream_llm(messages):
+                    full_response += chunk
+                    await websocket.send_json({
+                        "type": "response_chunk",
+                        "chunk": chunk
+                    })
+                
+                # 发送结束响应消息
+                await websocket.send_json({
+                    "type": "response_end",
+                    "full_response": full_response
                 })
                 
     except WebSocketDisconnect:
         print("Client disconnected")
-
-# 模拟LLM生成回复
-def generate_response(query, context):
-    # 这里只是模拟，实际应该调用真实的LLM API
-    if context:
-        return f"基于您提供的上下文，我找到了以下相关信息：\n\n{context[:1000]}...\n\n根据这些信息，我对您的问题'{query}'的回答是：这是一个很好的问题，相关文档提供了有用的背景信息。"
-    else:
-        return f"您好！您问的是：'{query}'。这是一个很好的问题，但我没有找到相关的背景信息来帮助回答。请确保您已经上传了相关文档到知识库。"
 
 # 启动应用
 if __name__ == "__main__":
