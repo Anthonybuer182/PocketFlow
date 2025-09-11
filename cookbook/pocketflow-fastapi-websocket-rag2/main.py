@@ -38,12 +38,10 @@ reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
 def init_db():
     conn = sqlite3.connect('data/knowledge_base.db')
     c = conn.cursor()
-    
-    # 删除旧表（如果存在）
-    c.execute('DROP TABLE IF EXISTS documents')
-    
-    # 创建新表
-    c.execute('''CREATE TABLE documents
+    # # 删除旧表（如果存在）
+    # c.execute('DROP TABLE IF EXISTS documents')
+    # 创建新表（如果不存在）
+    c.execute('''CREATE TABLE IF NOT EXISTS documents
                  (id TEXT PRIMARY KEY,
                   filename TEXT,
                   original_filename TEXT,
