@@ -3,6 +3,7 @@ import uuid
 import sqlite3
 import json
 import asyncio
+import logging
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -13,27 +14,42 @@ from typing import List, Optional
 import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer, CrossEncoder
-from logger import get_logger
 from utils.stream_llm import stream_llm
-logger = get_logger(__name__)
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 # 初始化应用
 app = FastAPI(title="RAG Demo")
+logger.info("FastAPI应用初始化完成")
 
 # 创建必要的目录
 os.makedirs("static/uploads", exist_ok=True)
 os.makedirs("data", exist_ok=True)
+logger.info("创建必要的目录: static/uploads, data")
 
 # 挂载静态文件
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+logger.info("静态文件挂载完成")
 
 # 初始化向量数据库客户端
 chroma_client = chromadb.PersistentClient(path="data/chroma")
+logger.info("向量数据库客户端初始化完成")
 
 # 初始化嵌入模型
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+logger.info("嵌入模型初始化完成: all-MiniLM-L6-v2")
 # 初始化重排模型
 reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+logger.info("重排模型初始化完成: cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 # 初始化SQLite数据库
 def init_db():
@@ -49,6 +65,7 @@ def init_db():
                   uploaded_at TIMESTAMP)''')
     conn.commit()
     conn.close()
+    logger.info("SQLite数据库初始化完成")
 
 init_db()
 
@@ -61,6 +78,7 @@ def add_document(filename, original_filename):
               (doc_id, filename, original_filename, datetime.now()))
     conn.commit()
     conn.close()
+    logger.info(f"添加文档记录: ID={doc_id}, 文件名={original_filename}, 存储名={filename}")
     return doc_id
 
 # 获取所有文档
@@ -94,31 +112,31 @@ def delete_document(doc_id):
     result = c.fetchone()
     if result:
         filename = result[0]
-        print(f"Deleting document {doc_id}, filename: {filename}")
+        logger.info(f"开始删除文档: ID={doc_id}, 文件名={filename}")
         
         # 删除文件
         file_path = f"static/uploads/{filename}"
         if os.path.exists(file_path):
             os.remove(file_path)
-            print(f"Deleted file: {file_path}")
+            logger.info(f"已删除文件: {file_path}")
         else:
-            print(f"File not found: {file_path}")
+            logger.warning(f"文件不存在: {file_path}")
         
         # 删除向量数据库中的集合
         try:
             collection_name = f"doc_{doc_id}"
             chroma_client.delete_collection(collection_name)
-            print(f"Deleted vector collection: {collection_name}")
+            logger.info(f"已删除向量集合: {collection_name}")
         except Exception as e:
-            print(f"Error deleting vector collection: {e}")
+            logger.error(f"删除向量集合时出错: {e}")
         
         # 删除数据库记录
         c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
         conn.commit()
-        print(f"Deleted database record for: {doc_id}")
+        logger.info(f"已删除数据库记录: 文档ID={doc_id}")
     
     conn.close()
-    print(f"Delete operation result: {result is not None}")
+    logger.info(f"删除操作结果: {'成功' if result is not None else '失败'}")
     return result is not None
 
 # 文本分块函数
@@ -137,14 +155,18 @@ def store_document_in_vector_db(doc_id, text):
     collection_name = f"doc_{doc_id}"
     try:
         collection = chroma_client.get_collection(collection_name)
+        logger.info(f"获取现有向量集合: {collection_name}")
     except:
         collection = chroma_client.create_collection(collection_name)
+        logger.info(f"创建新的向量集合: {collection_name}")
     
     # 分块处理文本
     chunks = chunk_text(text)
+    logger.info(f"文档分块完成: 文档ID={doc_id}, 块数={len(chunks)}")
     
     # 生成嵌入
     embeddings = embedding_model.encode(chunks)
+    logger.info(f"嵌入生成完成: 文档ID={doc_id}, 嵌入维度={embeddings.shape}")
     
     # 准备元数据
     metadatas = [{"doc_id": doc_id, "chunk_index": i} for i in range(len(chunks))]
@@ -157,6 +179,7 @@ def store_document_in_vector_db(doc_id, text):
         documents=chunks,
         ids=ids
     )
+    logger.info(f"文档存储到向量数据库完成: 文档ID={doc_id}, 总块数={len(chunks)}")
 
 # 多路召回检索
 def multi_retrieval(query, doc_ids, top_k=5):
@@ -211,7 +234,7 @@ def multi_retrieval(query, doc_ids, top_k=5):
             
             results.extend(combined_docs)
         except Exception as e:
-            print(f"检索文档 {doc_id} 时出错: {e}")
+            logger.error(f"检索文档 {doc_id} 时出错: {e}")
             continue
     
     return results
@@ -244,6 +267,8 @@ async def read_root(request: Request):
 # 添加文档API
 @app.post("/api/documents")
 async def add_document_api(file: UploadFile = File(...)):
+    logger.info(f"开始处理文件上传: 文件名={file.filename}, 文件大小={file.size}")
+    
     # 保存文件
     file_ext = os.path.splitext(file.filename)[1]
     filename = f"{uuid.uuid4()}{file_ext}"
@@ -252,6 +277,7 @@ async def add_document_api(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         content = await file.read()
         f.write(content)
+    logger.info(f"文件保存成功: 存储路径={file_path}")
     
     # 添加到数据库
     doc_id = add_document(filename, file.filename)
@@ -259,11 +285,14 @@ async def add_document_api(file: UploadFile = File(...)):
     # 读取文件内容 (这里简化处理，实际应该根据文件类型解析)
     try:
         text = content.decode('utf-8')
+        logger.info(f"文件内容解码成功: 文档ID={doc_id}, 文本长度={len(text)}")
     except:
         text = str(content)
+        logger.warning(f"文件内容无法解码为UTF-8, 使用字符串表示: 文档ID={doc_id}")
     
     # 存储到向量数据库
     store_document_in_vector_db(doc_id, text)
+    logger.info(f"文档处理完成: 文档ID={doc_id}, 原始文件名={file.filename}")
     
     return JSONResponse(content={"status": "success", "doc_id": doc_id})
 
@@ -362,7 +391,7 @@ async def search_document_api(doc_id: str, request: Request):
         })
         
     except Exception as e:
-        print(f"搜索文档时出错: {e}")
+        logger.error(f"搜索文档时出错: {e}")
         return JSONResponse(content={
             "status": "error", 
             "message": f"搜索失败: {str(e)}"
@@ -372,22 +401,27 @@ async def search_document_api(doc_id: str, request: Request):
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    logger.info("WebSocket连接已建立")
     try:
         while True:
             data = await websocket.receive_json()
+            logger.debug(f"收到WebSocket消息: {data}")
             
             if data['type'] == 'message':
                 message = data['message']
                 selected_docs = data.get('selected_docs', [])
+                logger.info(f"处理用户消息: 消息长度={len(message)}, 选择文档数={len(selected_docs)}")
                 
                 # 从选定的文档中检索相关内容
                 context = ""
                 if selected_docs:
                     # 多路召回检索
                     retrieved_docs = multi_retrieval(message, selected_docs, top_k=10)
+                    logger.info(f"多路召回检索完成: 检索到 {len(retrieved_docs)} 条结果")
                     
                     # 重排检索结果
                     reranked_docs = rerank_results(message, retrieved_docs, top_k=5)
+                    logger.info(f"重排完成: 保留 {len(reranked_docs)} 条最相关结果")
                     
                     # 构建上下文
                     context = "\n\n".join([f"[来源: {doc['source']}]\n{doc['text']}" for doc in reranked_docs])
@@ -407,6 +441,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({
                     "type": "response_start"
                 })
+                logger.info("开始生成AI回复")
                 
                 # 流式返回响应
                 full_response = ""
@@ -422,11 +457,18 @@ async def websocket_endpoint(websocket: WebSocket):
                     "type": "response_end",
                     "full_response": full_response
                 })
+                logger.info(f"AI回复生成完成: 回复长度={len(full_response)}")
                 
     except WebSocketDisconnect:
-        print("Client disconnected")
+        logger.info("客户端断开WebSocket连接")
+    except Exception as e:
+        logger.error(f"WebSocket处理异常: {e}")
+        await websocket.close(code=1011)
 
 # 启动应用
 if __name__ == "__main__":
     import uvicorn
+    logger.info("启动FastAPI应用服务器...")
+    logger.info(f"服务器地址: http://0.0.0.0:8000")
+    logger.info(f"API文档地址: http://0.0.0.0:8000/docs")
     uvicorn.run(app, host="0.0.0.0", port=8000)
