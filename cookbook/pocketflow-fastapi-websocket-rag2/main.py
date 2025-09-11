@@ -13,8 +13,9 @@ from typing import List, Optional
 import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer, CrossEncoder
+from logger import get_logger
 from utils.stream_llm import stream_llm
-
+logger = get_logger(__name__)
 # 初始化应用
 app = FastAPI(title="RAG Demo")
 
