@@ -102,6 +102,17 @@ def get_document(doc_id):
     conn.close()
     return document
 
+# 检查文档是否已存在（通过原始文件名）
+def document_exists(original_filename):
+    conn = sqlite3.connect('data/knowledge_base.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM documents WHERE original_filename = ?", (original_filename,))
+    result = c.fetchone()
+    document = dict(result) if result else None
+    conn.close()
+    return document is not None
+
 # 删除文档
 def delete_document(doc_id):
     conn = sqlite3.connect('data/knowledge_base.db')
@@ -268,6 +279,17 @@ async def read_root(request: Request):
 @app.post("/api/documents")
 async def add_document_api(file: UploadFile = File(...)):
     logger.info(f"开始处理文件上传: 文件名={file.filename}, 文件大小={file.size}")
+    
+    # 检查文档是否已存在
+    if document_exists(file.filename):
+        logger.warning(f"文档已存在，拒绝重复上传: {file.filename}")
+        return JSONResponse(
+            content={
+                "status": "error", 
+                "message": f"文档 '{file.filename}' 已上传过，不能重复上传"
+            },
+            status_code=400
+        )
     
     # 保存文件
     file_ext = os.path.splitext(file.filename)[1]

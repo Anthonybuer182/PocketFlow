@@ -1713,12 +1713,50 @@
                 } else {
                     // 更新上传状态为错误
                     updateUploadStatus(uploadId, 'error', '<i class="fas fa-exclamation-triangle"></i> 上传失败');
+                    
+                    // 显示错误Toast提示
+                    if (result.message) {
+                        showToast(result.message, 'error');
+                    } else {
+                        showToast('文件上传失败', 'error');
+                    }
                     console.error('文件上传失败:', result);
+                    
+                    // 移除上传中的文档项（不显示在documentList中）
+                    setTimeout(() => {
+                        const documentItem = document.querySelector(`[data-upload-id="${uploadId}"]`);
+                        if (documentItem) {
+                            documentItem.remove();
+                        }
+                        
+                        // 如果没有文档了，显示空状态
+                        const documentList = document.getElementById('document-list');
+                        if (documentList.children.length === 0) {
+                            showEmptyState();
+                        }
+                    }, 2000);
                 }
             } catch (error) {
                 // 更新上传状态为错误
                 updateUploadStatus(uploadId, 'error', '<i class="fas fa-exclamation-triangle"></i> 上传失败');
+                
+                // 显示错误Toast提示
+                showToast('上传文件时出错，请稍后重试', 'error');
                 console.error('上传文件时出错:', error);
+                
+                // 移除上传中的文档项（不显示在documentList中）
+                setTimeout(() => {
+                    const documentItem = document.querySelector(`[data-upload-id="${uploadId}"]`);
+                    if (documentItem) {
+                        documentItem.remove();
+                    }
+                    
+                    // 如果没有文档了，显示空状态
+                    const documentList = document.getElementById('document-list');
+                    if (documentList.children.length === 0) {
+                        showEmptyState();
+                    }
+                }, 2000);
             }
         }
 
