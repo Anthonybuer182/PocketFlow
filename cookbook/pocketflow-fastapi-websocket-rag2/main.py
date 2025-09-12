@@ -482,42 +482,23 @@ async def search_document_api(doc_id: str, request: Request):
         return JSONResponse(content={"status": "error", "message": "无效的请求格式"}, status_code=400)
     
     try:
-        # 获取文档对应的向量集合
-        collection_name = f"doc_{doc_id}"
-        collection = chroma_client.get_collection(collection_name)
+        # 使用多路召回检索
+        retrieved_docs = multi_retrieval(query, [doc_id], top_k=10)
+        logger.info(f"多路召回检索完成: 检索到 {len(retrieved_docs)} 条结果")
         
-        # 使用嵌入模型进行语义搜索
-        query_embedding = embedding_model.encode([query]).tolist()
+        # 重排检索结果
+        reranked_docs = rerank_results(query, retrieved_docs, top_k=5)
+        logger.info(f"重排完成: 保留 {len(reranked_docs)} 条最相关结果")
         
-        # 查询向量数据库
-        results = collection.query(
-            query_embeddings=query_embedding,
-            n_results=20,  # 获取更多结果用于重排
-            include=["documents", "distances", "metadatas"]
-        )
-        
-        # 处理搜索结果
+        # 转换格式以保持API兼容性
         search_results = []
-        if results and results['documents']:
-            for i, doc_list in enumerate(results['documents']):
-                for j, document_text in enumerate(doc_list):
-                    # 计算相似度分数（将距离转换为相似度，0-1范围）
-                    distance = results['distances'][i][j]
-                    similarity_score = 1 - distance  # 距离越小，相似度越高
-                    
-                    # 获取元数据
-                    metadata = results['metadatas'][i][j] if results['metadatas'] else {}
-                    page = metadata.get("page", 1)
-                    
-                    search_results.append({
-                        "content": document_text,
-                        "score": similarity_score,
-                        "page": page,
-                        "metadata": metadata
-                    })
-        
-        # 按分数排序（从高到低）
-        search_results.sort(key=lambda x: x["score"], reverse=True)
+        for doc in reranked_docs:
+            search_results.append({
+                "content": doc["text"],
+                "score": doc.get("rerank_score", doc.get("score", 0.5)),
+                "page": 1,  # 默认页码
+                "metadata": {"source": doc.get("source", "")}
+            })
         
         return JSONResponse(content={
             "status": "success",
