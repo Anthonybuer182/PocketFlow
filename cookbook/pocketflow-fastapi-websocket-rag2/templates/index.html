@@ -1220,6 +1220,7 @@
                     <div class="kb-selector">
                         <div class="kb-selector-icon-btn" onclick="toggleDocumentSelector()">
                             <i class="fas fa-book"></i>
+                            <span id="selected-docs-count" style="position: absolute; top: -5px; right: -5px; background: var(--accent); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; display: none;">0</span>
                         </div>
                     </div>
                     <input type="text" id="message-input" placeholder="输入您的问题..." onkeypress="handleKeyPress(event)">
@@ -1287,6 +1288,7 @@
 
     <script>
         let websocket = null;
+        let selectedDocs = []; // 存储选中的文档ID列表
 
         // 初始化页面
         document.addEventListener('DOMContentLoaded', function() {
@@ -1340,6 +1342,18 @@
                         // 添加点击事件
                         docItem.addEventListener('click', function() {
                             this.classList.toggle('selected');
+                            const docId = this.getAttribute('data-doc-id');
+                            
+                            // 更新选中文档列表
+                            if (this.classList.contains('selected')) {
+                                if (!selectedDocs.includes(docId)) {
+                                    selectedDocs.push(docId);
+                                }
+                            } else {
+                                selectedDocs = selectedDocs.filter(id => id !== docId);
+                            }
+                            
+                            console.log('当前选中的文档:', selectedDocs);
                         });
                         
                         docSelector.appendChild(docItem);
@@ -1464,7 +1478,8 @@
             if (websocket && websocket.readyState === WebSocket.OPEN) {
                 websocket.send(JSON.stringify({
                     type: 'message',
-                    message: message
+                    message: message,
+                    selected_docs: selectedDocs
                 }));
             } else {
                 addMessage('连接已断开，请刷新页面重试', 'bot');
