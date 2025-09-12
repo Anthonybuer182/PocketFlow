@@ -455,6 +455,125 @@ async def download_document(doc_id: str):
         media_type='application/octet-stream'
     )
 
+# 查看文档内容API
+@app.get("/api/documents/{doc_id}/view")
+async def view_document(doc_id: str):
+    document = get_document(doc_id)
+    if not document:
+        return JSONResponse(content={"status": "error", "message": "文档不存在"}, status_code=404)
+    
+    file_path = f"static/uploads/{document['filename']}"
+    if not os.path.exists(file_path):
+        return JSONResponse(content={"status": "error", "message": "文件不存在"}, status_code=404)
+    
+    # 读取文件内容
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        # 如果UTF-8解码失败，尝试其他编码或返回二进制数据
+        try:
+            with open(file_path, 'r', encoding='gbk') as f:
+                content = f.read()
+        except:
+            # 如果还是失败，返回错误信息
+            return JSONResponse(content={"status": "error", "message": "无法读取文件内容（不支持的编码格式）"}, status_code=400)
+    
+    # 返回HTML页面显示文档内容
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{document['original_filename']} - 文档查看</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                min-height: 100vh;
+            }}
+            .container {{
+                max-width: 1000px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                padding: 30px;
+            }}
+            .header {{
+                text-align: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 2px solid #e2e8f0;
+            }}
+            .header h1 {{
+                color: #6e8efb;
+                margin-bottom: 10px;
+            }}
+            .filename {{
+                color: #6c757d;
+                font-size: 1.1rem;
+            }}
+            .content {{
+                line-height: 1.6;
+                font-size: 16px;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                background: #fafbfc;
+                padding: 25px;
+                border-radius: 8px;
+                border-left: 4px solid #6e8efb;
+                max-height: 70vh;
+                overflow-y: auto;
+            }}
+            .content::-webkit-scrollbar {{
+                width: 8px;
+            }}
+            .content::-webkit-scrollbar-track {{
+                background: #f1f3f5;
+                border-radius: 4px;
+            }}
+            .content::-webkit-scrollbar-thumb {{
+                background: #6e8efb;
+                border-radius: 4px;
+            }}
+            .back-btn {{
+                display: inline-block;
+                margin-top: 20px;
+                padding: 12px 24px;
+                background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%);
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+            }}
+            .back-btn:hover {{
+                transform: translateY(-2px);
+                box-shadow: 0 4px 15px rgba(110, 142, 251, 0.3);
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-file-alt"></i> 文档内容查看</h1>
+                <div class="filename">{document['original_filename']}</div>
+            </div>
+            <div class="content">{content}</div>
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="javascript:window.close()" class="back-btn">关闭窗口</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return HTMLResponse(content=html_content)
+
 # 删除文档API
 @app.delete("/api/documents/{doc_id}")
 async def delete_document_api(doc_id: str):
