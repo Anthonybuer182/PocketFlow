@@ -1,8 +1,7 @@
 import os
 import uuid
 import sqlite3
-import json
-import asyncio
+import re
 import logging
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile, Form, Request
@@ -10,10 +9,11 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Callable
 import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer, CrossEncoder
+from text_chunk import recursive_text_split
 from utils.stream_llm import stream_llm
 
 # 配置日志
@@ -150,129 +150,6 @@ def delete_document(doc_id):
     logger.info(f"删除操作结果: {'成功' if result is not None else '失败'}")
     return result is not None
 
-# 文本分块函数（递归分块）
-def chunk_text(text, chunk_size=500, overlap=0):
-    """
-    递归分块函数，按分隔符优先级顺序找到一个分隔符进行分块，
-    如果块仍然大于chunk_size则递归分块
-    
-    Args:
-        text: 要分块的文本
-        chunk_size: 目标块大小
-        overlap: 块之间的重叠大小
-    
-    Returns:
-        list: 分块后的文本列表
-    """
-    # 分隔符优先级列表
-    separators = ["\n\n", "\n", ". ", "? ", "! ", " ", ""]
-    
-    def recursive_chunk(text, separators, chunk_size):
-        """递归分块辅助函数"""
-        if len(text) <= chunk_size:
-            return [text]
-        
-        # 按顺序查找第一个可用的分隔符
-        for sep in separators:
-            if sep == "":  # 最后一个分隔符是空字符串，直接按长度分割
-                # 直接按chunk_size分割
-                chunks = []
-                start = 0
-                while start < len(text):
-                    end = start + chunk_size
-                    if end > len(text):
-                        end = len(text)
-                    chunk = text[start:end]
-                    # 如果块仍然过大，递归分块
-                    if len(chunk) > chunk_size:
-                        sub_chunks = recursive_chunk(chunk, separators, chunk_size)
-                        chunks.extend(sub_chunks)
-                    else:
-                        chunks.append(chunk)
-                    start = end
-                return chunks
-            
-            # 查找分隔符位置
-            if sep in text:
-                # 找到分隔符，在分隔符处分割
-                parts = text.split(sep)
-                chunks = []
-                current_chunk = ""
-                
-                for i, part in enumerate(parts):
-                    # 计算添加分隔符后的长度（除了第一个部分）
-                    add_length = len(sep) if i > 0 and current_chunk else 0
-                    
-                    # 如果当前块加上新部分不超过chunk_size，则合并
-                    potential_length = len(current_chunk) + add_length + len(part)
-                    if potential_length <= chunk_size:
-                        if current_chunk:
-                            current_chunk += sep + part
-                        else:
-                            current_chunk = part
-                    else:
-                        # 当前块已满，添加到结果中
-                        if current_chunk:
-                            chunks.append(current_chunk)
-                        
-                        # 如果单个部分就超过chunk_size，需要递归分块
-                        if len(part) > chunk_size:
-                            sub_chunks = recursive_chunk(part, separators, chunk_size)
-                            chunks.extend(sub_chunks)
-                            current_chunk = ""
-                        else:
-                            current_chunk = part
-                
-                # 添加最后一个块
-                if current_chunk:
-                    chunks.append(current_chunk)
-                
-                # 检查是否有块仍然过大，需要进一步分块
-                final_chunks = []
-                for chunk in chunks:
-                    if len(chunk) > chunk_size:
-                        sub_chunks = recursive_chunk(chunk, separators, chunk_size)
-                        final_chunks.extend(sub_chunks)
-                    else:
-                        final_chunks.append(chunk)
-                
-                return final_chunks
-        
-        # 如果没有找到任何分隔符，直接按长度分割
-        if len(text) > chunk_size:
-            mid = len(text) // 2
-            left_chunks = recursive_chunk(text[:mid], separators, chunk_size)
-            right_chunks = recursive_chunk(text[mid:], separators, chunk_size)
-            return left_chunks + right_chunks
-        else:
-            return [text]
-    
-    # 执行递归分块
-    chunks = recursive_chunk(text, separators, chunk_size)
-    
-    # 应用重叠（如果指定了重叠并且有多个块）
-    if overlap > 0 and len(chunks) > 1:
-        overlapped_chunks = []
-        for i in range(len(chunks)):
-            if i == 0:
-                # 第一个块保持不变
-                overlapped_chunks.append(chunks[i])
-            else:
-                # 从上一个块的末尾取overlap个字符添加到当前块的开头
-                prev_chunk = chunks[i-1]
-                overlap_text = prev_chunk[-overlap:] if len(prev_chunk) >= overlap else prev_chunk
-                # 确保重叠后不超过chunk_size
-                combined = overlap_text + chunks[i]
-                if len(combined) > chunk_size:
-                    # 如果超过大小，需要调整
-                    excess = len(combined) - chunk_size
-                    overlapped_chunks.append(combined[excess:])  # 截断开头部分
-                else:
-                    overlapped_chunks.append(combined)
-        return overlapped_chunks
-    
-    return chunks
-
 # 存储文档到向量数据库
 def store_document_in_vector_db(doc_id, text):
     # 获取或创建集合
@@ -285,7 +162,12 @@ def store_document_in_vector_db(doc_id, text):
         logger.info(f"创建新的向量集合: {collection_name}")
     
     # 分块处理文本
-    chunks = chunk_text(text)
+    chunks = recursive_text_split(
+        text=text,
+        chunk_size=150,
+        chunk_overlap=30,
+        separators=["\n\n", "\n", ". ", "? ", "! ", " "]
+    )
     logger.info(f"文档分块完成: 文档ID={doc_id}, 块数={len(chunks)}")
     
     # 生成嵌入
