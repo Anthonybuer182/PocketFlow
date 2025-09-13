@@ -360,11 +360,120 @@
             background: linear-gradient(135deg, rgba(110, 142, 251, 0.1) 0%, rgba(167, 119, 227, 0.1) 100%);
             color: var(--primary);
             font-size: 0.9rem;
-            padding: 12px 18px;
+            padding: 16px;
             border-radius: 12px;
             margin: 15px 0;
-            text-align: center;
             border: 1px solid rgba(110, 142, 251, 0.2);
+            text-align: left;
+        }
+
+        .context-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 5px 0;
+        }
+
+        .toggle-details-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            margin-left: auto;
+            transition: var(--transition);
+        }
+
+        .toggle-details-btn:hover {
+            background: rgba(110, 142, 251, 0.1);
+        }
+
+        .context-details {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(110, 142, 251, 0.2);
+        }
+
+        .document-info {
+            margin-bottom: 12px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .doc-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: rgba(110, 142, 251, 0.05);
+            cursor: pointer;
+            transition: var(--transition);
+            border-radius: 6px;
+        }
+
+        .doc-header:hover {
+            background: rgba(110, 142, 251, 0.1);
+        }
+
+        .doc-number {
+            font-weight: 600;
+            color: var(--primary);
+            min-width: 20px;
+        }
+
+        .doc-name {
+            flex: 1;
+            font-weight: 500;
+            color: var(--dark);
+        }
+
+        .doc-info-count {
+            font-size: 0.8rem;
+            color: #6c757d;
+            background: rgba(110, 142, 251, 0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        .doc-content {
+            padding: 10px 15px;
+            background: rgba(110, 142, 251, 0.02);
+            border-radius: 0 0 6px 6px;
+            margin-top: 2px;
+        }
+
+        .info-item {
+            display: flex;
+            gap: 8px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(110, 142, 251, 0.1);
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-number {
+            font-weight: 600;
+            color: var(--primary);
+            min-width: 20px;
+        }
+
+        .info-text {
+            flex: 1;
+            color: #495057;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .no-documents, .no-content {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 10px;
         }
         
         .chat-input {
@@ -1508,14 +1617,112 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // 添加上下文消息
-        function addContextMessage(text) {
+        // 添加上下文消息 - 显示引用的文档信息
+        function addContextMessage(contextData) {
             const messagesContainer = document.getElementById('chat-messages');
+            
+            // 创建上下文消息容器
             const messageElement = document.createElement('div');
             messageElement.className = 'context-message';
-            messageElement.innerHTML = `<i class="fas fa-info-circle"></i> ${text}`;
+            
+            // 解析上下文数据
+            let contextInfo;
+            try {
+                contextInfo = typeof contextData === 'string' ? JSON.parse(contextData) : contextData;
+            } catch (e) {
+                // 如果不是JSON格式，直接显示原始文本
+                messageElement.innerHTML = `<i class="fas fa-info-circle"></i> ${contextData}`;
+                messagesContainer.appendChild(messageElement);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                return;
+            }
+            
+            // 提取文档信息
+            const documents = contextInfo.documents || [];
+            const totalDocs = documents.length;
+            
+            // 构建消息内容
+            let html = `
+                <div class="context-header">
+                    <i class="fas fa-info-circle"></i> 
+                    <span>引用了 ${totalDocs} 个文档</span>
+                    <button class="toggle-details-btn" onclick="toggleContextDetails(this)">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                <div class="context-details" style="display: none;">
+            `;
+            
+            if (totalDocs === 0) {
+                html += `<div class="no-documents">未引用任何文档</div>`;
+            } else {
+                documents.forEach((doc, index) => {
+                    const docName = doc.document_name || '未知文档';
+                    const relevantInfo = doc.relevant_content || [];
+                    
+                    html += `
+                        <div class="document-info">
+                            <div class="doc-header" onclick="toggleDocumentContent(this)">
+                                <span class="doc-number">${index + 1}.</span>
+                                <span class="doc-name">${docName}</span>
+                                <span class="doc-info-count">${relevantInfo.length} 条相关信息</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="doc-content" style="display: none;">
+                    `;
+                    
+                    if (relevantInfo.length === 0) {
+                        html += `<div class="no-content">暂无相关信息</div>`;
+                    } else {
+                        relevantInfo.forEach((info, infoIndex) => {
+                            html += `
+                                <div class="info-item">
+                                    <span class="info-number">${infoIndex + 1}.</span>
+                                    <span class="info-text">${info}</span>
+                                </div>
+                            `;
+                        });
+                    }
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += `</div>`;
+            messageElement.innerHTML = html;
             messagesContainer.appendChild(messageElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // 切换上下文详细信息显示
+        function toggleContextDetails(button) {
+            const details = button.parentElement.nextElementSibling;
+            const icon = button.querySelector('i');
+            
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                icon.className = 'fas fa-chevron-up';
+            } else {
+                details.style.display = 'none';
+                icon.className = 'fas fa-chevron-down';
+            }
+        }
+        
+        // 切换文档内容显示
+        function toggleDocumentContent(header) {
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('i');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.className = 'fas fa-chevron-up';
+            } else {
+                content.style.display = 'none';
+                icon.className = 'fas fa-chevron-down';
+            }
         }
 
         // 开始新的机器人消息（流式响应）

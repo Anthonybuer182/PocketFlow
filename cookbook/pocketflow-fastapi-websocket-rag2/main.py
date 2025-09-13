@@ -516,7 +516,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 # 从选定的文档中检索相关内容
                 context = ""
+                context_documents = []
                 if selected_docs:
+                    # 获取文档信息
+                    documents_info = []
+                    for doc_id in selected_docs:
+                        doc_info = get_document(doc_id)
+                        if doc_info:
+                            documents_info.append({
+                                "id": doc_id,
+                                "name": doc_info['original_filename']
+                            })
+                    
                     # 多路召回检索
                     retrieved_docs = multi_retrieval(message, selected_docs, top_k=10)
                     logger.info(f"多路召回检索完成: 检索到 {len(retrieved_docs)} 条结果")
@@ -525,12 +536,38 @@ async def websocket_endpoint(websocket: WebSocket):
                     reranked_docs = rerank_results(message, retrieved_docs, top_k=5)
                     logger.info(f"重排完成: 保留 {len(reranked_docs)} 条最相关结果")
                     
-                    # 构建上下文
+                    # 按文档分组相关信息
+                    doc_relevant_content = {}
+                    for doc in reranked_docs:
+                        # 从source中提取文档ID
+                        source_match = re.search(r'文档: ([^)]+)', doc.get('source', ''))
+                        if source_match:
+                            doc_id = source_match.group(1)
+                            if doc_id not in doc_relevant_content:
+                                doc_relevant_content[doc_id] = []
+                            doc_relevant_content[doc_id].append(doc['text'])
+                    
+                    # 构建上下文文档信息
+                    for doc_info in documents_info:
+                        doc_id = doc_info['id']
+                        relevant_content = doc_relevant_content.get(doc_id, [])
+                        context_documents.append({
+                            "document_id": doc_id,
+                            "document_name": doc_info['name'],
+                            "relevant_content": relevant_content
+                        })
+                    
+                    # 构建LLM上下文
                     context = "\n\n".join([f"[来源: {doc['source']}]\n{doc['text']}" for doc in reranked_docs])
                     
+                    # 发送结构化的上下文信息
                     await websocket.send_json({
                         "type": "context",
-                        "context": f"已从 {len(selected_docs)} 个文档中检索到 {len(reranked_docs)} 条相关信息"
+                        "context": {
+                            "total_documents": len(selected_docs),
+                            "total_relevant_info": len(reranked_docs),
+                            "documents": context_documents
+                        }
                     })
                 
                 # 使用OpenAI API流式生成回复
