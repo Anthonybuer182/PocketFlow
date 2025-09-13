@@ -1289,34 +1289,34 @@
 
         /* Markdown 样式 */
         .bot-message .markdown-content {
-            line-height: 1.6;
+            line-height: 1.5; /* 与普通文本保持一致的行高 */
         }
         
+        /* 调整markdown段落的间距，使其更接近普通文本 */
+        .bot-message .markdown-content p {
+            margin: 0.8em 0; /* 减少段落间距 */
+        }
+        
+        /* 调整列表项间距 */
+        .bot-message .markdown-content li {
+            margin: 0.3em 0; /* 减少列表项间距 */
+        }
+        
+        /* 调整标题间距 */
         .bot-message .markdown-content h1,
         .bot-message .markdown-content h2,
         .bot-message .markdown-content h3,
         .bot-message .markdown-content h4,
         .bot-message .markdown-content h5,
         .bot-message .markdown-content h6 {
-            margin: 1.2em 0 0.6em 0;
-            color: var(--primary);
-            font-weight: 600;
+            margin: 0.8em 0 0.4em 0; /* 减少标题间距 */
         }
         
-        .bot-message .markdown-content h1 {
-            font-size: 1.4em;
-            border-bottom: 2px solid var(--primary);
-            padding-bottom: 0.3em;
-        }
-        
-        .bot-message .markdown-content h2 {
-            font-size: 1.3em;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 0.3em;
-        }
-        
-        .bot-message .markdown-content h3 {
-            font-size: 1.2em;
+        /* 确保普通文本消息的样式一致性 */
+        .user-message p,
+        .bot-message:not(.markdown-content) p {
+            line-height: 1.5;
+            margin: 0;
         }
         
         .bot-message .markdown-content p {
@@ -1859,15 +1859,13 @@
             const messagesContainer = document.getElementById('chat-messages');
             const messageId = 'streaming-message-' + Date.now();
             const contentId = 'streaming-content-' + Date.now();
-            const rawContentId = 'streaming-raw-' + Date.now();
             
             const messageElement = document.createElement('div');
             messageElement.className = 'message bot-message';
             messageElement.id = messageId;
             messageElement.innerHTML = `
                 <strong>AI助手</strong>
-                <div id="${contentId}" style="display: none;"></div>
-                <p id="${rawContentId}"></p>
+                <div id="${contentId}" class="markdown-content"></div>
             `;
             messagesContainer.appendChild(messageElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -1876,8 +1874,6 @@
             window.currentStreamingMessage = {
                 messageId: messageId,
                 contentId: contentId,
-                rawContentId: rawContentId,
-                isMarkdown: false,
                 accumulatedText: ''
             };
         }
@@ -1885,34 +1881,55 @@
         // 添加机器人消息片段（流式响应）
         function appendBotMessageChunk(chunk) {
             if (window.currentStreamingMessage) {
-                const { contentId, rawContentId, isMarkdown } = window.currentStreamingMessage;
+                const { contentId } = window.currentStreamingMessage;
                 const contentElement = document.getElementById(contentId);
-                const rawElement = document.getElementById(rawContentId);
                 
-                // 累积文本用于markdown检测
+                // 累积文本
                 window.currentStreamingMessage.accumulatedText += chunk;
                 
-                if (!isMarkdown) {
-                    // 检查是否需要切换到markdown模式
-                    if (isMarkdownContent(window.currentStreamingMessage.accumulatedText)) {
-                        window.currentStreamingMessage.isMarkdown = true;
-                        // 切换到markdown模式
-                        rawElement.style.display = 'none';
-                        contentElement.style.display = 'block';
-                        contentElement.className = 'markdown-content';
-                        contentElement.innerHTML = renderMarkdown(window.currentStreamingMessage.accumulatedText);
-                    } else {
-                        // 继续显示原始文本
-                        rawElement.textContent += chunk;
-                    }
-                } else {
-                    // 已经在markdown模式，实时更新
-                    contentElement.innerHTML = renderMarkdown(window.currentStreamingMessage.accumulatedText);
-                }
+                // 始终使用markdown渲染，但对于不完整的markdown语法进行特殊处理
+                const renderedContent = renderMarkdownWithFallback(window.currentStreamingMessage.accumulatedText);
+                contentElement.innerHTML = renderedContent;
                 
+                // 自动滚动到底部
                 const messagesContainer = document.getElementById('chat-messages');
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
+        }
+
+        // 智能markdown渲染，处理不完整的markdown语法
+        function renderMarkdownWithFallback(text) {
+            try {
+                // 先尝试正常渲染
+                let result = marked.parse(text);
+                
+                // 检查是否有未闭合的代码块
+                const codeBlockCount = (text.match(/```/g) || []).length;
+                if (codeBlockCount % 2 !== 0) {
+                    // 有未闭合的代码块，添加临时闭合标记
+                    result = result.replace(/(<pre><code[^>]*>)([\s\S]*?)(?=<\/code><\/pre>|$)/g, 
+                        (match, openTag, content) => {
+                            // 如果内容以未闭合的代码块结束，添加临时样式
+                            if (!content.trim().endsWith('```')) {
+                                return `${openTag}${content}`;
+                            }
+                            return match;
+                        });
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('Markdown解析失败:', error);
+                // 如果解析失败，返回原始文本但保持markdown样式
+                return `<div style="white-space: pre-wrap;">${escapeHtml(text)}</div>`;
+            }
+        }
+
+        // HTML转义函数
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // 渲染Markdown内容
@@ -1949,35 +1966,15 @@
         // 完成机器人消息（流式响应）
         function completeBotMessage(fullResponse) {
             if (window.currentStreamingMessage) {
-                const { messageId, contentId, rawContentId, isMarkdown } = window.currentStreamingMessage;
+                const { messageId, contentId } = window.currentStreamingMessage;
                 const messageElement = document.getElementById(messageId);
                 if (messageElement) {
                     messageElement.removeAttribute('id');
                     
-                    if (isMarkdown) {
-                        // 已经是markdown模式，确保最终内容正确
-                        const contentElement = document.getElementById(contentId);
-                        if (contentElement) {
-                            contentElement.innerHTML = renderMarkdown(fullResponse);
-                        }
-                    } else {
-                        // 普通文本模式，检查是否需要最终转换为markdown
-                        const rawElement = document.getElementById(rawContentId);
-                        if (rawElement) {
-                            if (isMarkdownContent(fullResponse)) {
-                                // 切换到markdown模式
-                                rawElement.style.display = 'none';
-                                const contentElement = document.getElementById(contentId);
-                                if (contentElement) {
-                                    contentElement.style.display = 'block';
-                                    contentElement.className = 'markdown-content';
-                                    contentElement.innerHTML = renderMarkdown(fullResponse);
-                                }
-                            } else {
-                                // 保持普通文本
-                                rawElement.textContent = fullResponse;
-                            }
-                        }
+                    // 确保最终内容正确渲染
+                    const contentElement = document.getElementById(contentId);
+                    if (contentElement) {
+                        contentElement.innerHTML = renderMarkdownWithFallback(fullResponse);
                     }
                 }
                 // 清除当前消息引用
