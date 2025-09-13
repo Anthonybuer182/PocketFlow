@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RAG 知识库系统</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --primary: #6e8efb;
@@ -1285,6 +1286,131 @@
             padding: 0 2px;
             border-radius: 2px;
         }
+
+        /* Markdown 样式 */
+        .bot-message .markdown-content {
+            line-height: 1.6;
+        }
+        
+        .bot-message .markdown-content h1,
+        .bot-message .markdown-content h2,
+        .bot-message .markdown-content h3,
+        .bot-message .markdown-content h4,
+        .bot-message .markdown-content h5,
+        .bot-message .markdown-content h6 {
+            margin: 1.2em 0 0.6em 0;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .bot-message .markdown-content h1 {
+            font-size: 1.4em;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 0.3em;
+        }
+        
+        .bot-message .markdown-content h2 {
+            font-size: 1.3em;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.3em;
+        }
+        
+        .bot-message .markdown-content h3 {
+            font-size: 1.2em;
+        }
+        
+        .bot-message .markdown-content p {
+            margin: 1em 0;
+        }
+        
+        .bot-message .markdown-content ul,
+        .bot-message .markdown-content ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        
+        .bot-message .markdown-content li {
+            margin: 0.5em 0;
+        }
+        
+        .bot-message .markdown-content blockquote {
+            border-left: 4px solid var(--primary);
+            margin: 1em 0;
+            padding: 0.5em 1em;
+            background: rgba(110, 142, 251, 0.05);
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .bot-message .markdown-content code {
+            background: rgba(110, 142, 251, 0.1);
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        
+        .bot-message .markdown-content pre {
+            background: rgba(110, 142, 251, 0.05);
+            padding: 1em;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1em 0;
+            border: 1px solid rgba(110, 142, 251, 0.1);
+        }
+        
+        .bot-message .markdown-content pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+        }
+        
+        .bot-message .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            border: 1px solid var(--border);
+        }
+        
+        .bot-message .markdown-content th,
+        .bot-message .markdown-content td {
+            padding: 0.75em;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        
+        .bot-message .markdown-content th {
+            background: rgba(110, 142, 251, 0.1);
+            font-weight: 600;
+        }
+        
+        .bot-message .markdown-content tr:nth-child(even) {
+            background: rgba(110, 142, 251, 0.02);
+        }
+        
+        .bot-message .markdown-content a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .bot-message .markdown-content a:hover {
+            text-decoration: underline;
+        }
+        
+        .bot-message .markdown-content strong {
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .bot-message .markdown-content em {
+            font-style: italic;
+            color: #6c757d;
+        }
+        
+        .bot-message .markdown-content hr {
+            border: none;
+            border-top: 2px solid var(--border);
+            margin: 2em 0;
+        }
     </style>
 </head>
 <body>
@@ -1733,13 +1859,15 @@
             const messagesContainer = document.getElementById('chat-messages');
             const messageId = 'streaming-message-' + Date.now();
             const contentId = 'streaming-content-' + Date.now();
+            const rawContentId = 'streaming-raw-' + Date.now();
             
             const messageElement = document.createElement('div');
             messageElement.className = 'message bot-message';
             messageElement.id = messageId;
             messageElement.innerHTML = `
                 <strong>AI助手</strong>
-                <p id="${contentId}"></p>
+                <div id="${contentId}" style="display: none;"></div>
+                <p id="${rawContentId}"></p>
             `;
             messagesContainer.appendChild(messageElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -1747,31 +1875,109 @@
             // 存储当前消息ID用于后续操作
             window.currentStreamingMessage = {
                 messageId: messageId,
-                contentId: contentId
+                contentId: contentId,
+                rawContentId: rawContentId,
+                isMarkdown: false,
+                accumulatedText: ''
             };
         }
 
         // 添加机器人消息片段（流式响应）
         function appendBotMessageChunk(chunk) {
             if (window.currentStreamingMessage) {
-                const contentElement = document.getElementById(window.currentStreamingMessage.contentId);
-                if (contentElement) {
-                    contentElement.textContent += chunk;
-                    const messagesContainer = document.getElementById('chat-messages');
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                const { contentId, rawContentId, isMarkdown } = window.currentStreamingMessage;
+                const contentElement = document.getElementById(contentId);
+                const rawElement = document.getElementById(rawContentId);
+                
+                // 累积文本用于markdown检测
+                window.currentStreamingMessage.accumulatedText += chunk;
+                
+                if (!isMarkdown) {
+                    // 检查是否需要切换到markdown模式
+                    if (isMarkdownContent(window.currentStreamingMessage.accumulatedText)) {
+                        window.currentStreamingMessage.isMarkdown = true;
+                        // 切换到markdown模式
+                        rawElement.style.display = 'none';
+                        contentElement.style.display = 'block';
+                        contentElement.className = 'markdown-content';
+                        contentElement.innerHTML = renderMarkdown(window.currentStreamingMessage.accumulatedText);
+                    } else {
+                        // 继续显示原始文本
+                        rawElement.textContent += chunk;
+                    }
+                } else {
+                    // 已经在markdown模式，实时更新
+                    contentElement.innerHTML = renderMarkdown(window.currentStreamingMessage.accumulatedText);
                 }
+                
+                const messagesContainer = document.getElementById('chat-messages');
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
+        }
+
+        // 渲染Markdown内容
+        function renderMarkdown(text) {
+            try {
+                // 使用marked.js解析markdown
+                return marked.parse(text);
+            } catch (error) {
+                console.error('Markdown解析失败:', error);
+                // 如果解析失败，返回原始文本
+                return text;
+            }
+        }
+
+        // 检测是否为Markdown内容
+        function isMarkdownContent(text) {
+            // 简单的Markdown检测逻辑
+            const markdownPatterns = [
+                /^#+\s/,                     // 标题
+                /\*\*.+?\*\*/,               // 粗体
+                /\*.+?\*/,                   // 斜体
+                /\[.+?\]\(.+?\)/,            // 链接
+                /^- /,                       // 无序列表
+                /^\d+\. /,                   // 有序列表
+                /```[\s\S]*?```/,            // 代码块
+                /`[^`]+?`/,                  // 行内代码
+                />\s/,                       // 引用
+                /\|.+\|/                     // 表格
+            ];
+            
+            return markdownPatterns.some(pattern => pattern.test(text));
         }
 
         // 完成机器人消息（流式响应）
         function completeBotMessage(fullResponse) {
             if (window.currentStreamingMessage) {
-                const messageElement = document.getElementById(window.currentStreamingMessage.messageId);
+                const { messageId, contentId, rawContentId, isMarkdown } = window.currentStreamingMessage;
+                const messageElement = document.getElementById(messageId);
                 if (messageElement) {
                     messageElement.removeAttribute('id');
-                    const contentElement = messageElement.querySelector('p');
-                    if (contentElement) {
-                        contentElement.textContent = fullResponse;
+                    
+                    if (isMarkdown) {
+                        // 已经是markdown模式，确保最终内容正确
+                        const contentElement = document.getElementById(contentId);
+                        if (contentElement) {
+                            contentElement.innerHTML = renderMarkdown(fullResponse);
+                        }
+                    } else {
+                        // 普通文本模式，检查是否需要最终转换为markdown
+                        const rawElement = document.getElementById(rawContentId);
+                        if (rawElement) {
+                            if (isMarkdownContent(fullResponse)) {
+                                // 切换到markdown模式
+                                rawElement.style.display = 'none';
+                                const contentElement = document.getElementById(contentId);
+                                if (contentElement) {
+                                    contentElement.style.display = 'block';
+                                    contentElement.className = 'markdown-content';
+                                    contentElement.innerHTML = renderMarkdown(fullResponse);
+                                }
+                            } else {
+                                // 保持普通文本
+                                rawElement.textContent = fullResponse;
+                            }
+                        }
                     }
                 }
                 // 清除当前消息引用
