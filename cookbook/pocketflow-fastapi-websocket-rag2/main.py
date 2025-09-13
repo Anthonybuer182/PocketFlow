@@ -166,7 +166,7 @@ def store_document_in_vector_db(doc_id, text):
         text=text,
         chunk_size=150,
         chunk_overlap=30,
-        separators=["\n\n", "\n", ". ", "? ", "! ", " "]
+        separators=["\r\n\r\n", "\n\n", "\r\n", "\n", ". ", "? ", "! ", " "]
     )
     logger.info(f"文档分块完成: 文档ID={doc_id}, 块数={len(chunks)}")
     
