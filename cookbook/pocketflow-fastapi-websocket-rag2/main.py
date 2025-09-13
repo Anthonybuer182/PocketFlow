@@ -40,13 +40,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 logger.info("静态文件挂载完成")
 
-# 初始化向量数据库客户端
-chroma_client = chromadb.PersistentClient(path="data/chroma")
-logger.info("向量数据库客户端初始化完成")
-
 # 初始化嵌入模型
 embedding_model = SentenceTransformer('shibing624/text2vec-base-chinese')
 logger.info("嵌入模型初始化完成: shibing624/text2vec-base-chinese")
+
+# 自定义嵌入函数
+def custom_embedding_function(texts):
+    embeddings = embedding_model.encode(texts)
+    return embeddings.tolist()
+
+# 初始化向量数据库客户端，使用自定义嵌入函数
+chroma_client = chromadb.PersistentClient(
+    path="data/chroma",
+    settings=Settings(anonymized_telemetry=False)  # 禁用遥测
+)
+logger.info("向量数据库客户端初始化完成")
 # 初始化重排模型
 reranker = CrossEncoder('cross-encoder/mmarco-mMiniLMv2-L12-H384-v1')
 logger.info("重排模型初始化完成: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")
@@ -158,7 +166,10 @@ def store_document_in_vector_db(doc_id, text):
         collection = chroma_client.get_collection(collection_name)
         logger.info(f"获取现有向量集合: {collection_name}")
     except:
-        collection = chroma_client.create_collection(collection_name)
+        collection = chroma_client.create_collection(
+            collection_name,
+            embedding_function=custom_embedding_function
+        )
         logger.info(f"创建新的向量集合: {collection_name}")
     
     # 分块处理文本
@@ -187,7 +198,7 @@ def store_document_in_vector_db(doc_id, text):
     )
     logger.info(f"文档存储到向量数据库完成: 文档ID={doc_id}, 总块数={len(chunks)}")
 
-# 多路召回检索
+# 多路召回检索（仅使用嵌入相似度，避免ChromaDB自动下载模型）
 def multi_retrieval(query, doc_ids, top_k=5):
     results = []
     
@@ -195,50 +206,24 @@ def multi_retrieval(query, doc_ids, top_k=5):
         try:
             collection = chroma_client.get_collection(f"doc_{doc_id}")
             
-            # 方法1: 基于嵌入相似度
+            # 仅使用基于嵌入相似度的检索，避免文本检索触发模型下载
             query_embedding = embedding_model.encode([query]).tolist()
             embedding_results = collection.query(
                 query_embeddings=query_embedding,
                 n_results=top_k
             )
             
-            # 方法2: 基于文本相似度
-            text_results = collection.query(
-                query_texts=[query],
-                n_results=top_k
-            )
-            
-            # 合并结果
-            combined_docs = []
-            seen_ids = set()
-            
             # 处理嵌入检索结果
             if embedding_results['documents']:
                 for i, doc_list in enumerate(embedding_results['documents']):
                     for j, doc in enumerate(doc_list):
                         chunk_id = embedding_results['ids'][i][j]
-                        if chunk_id not in seen_ids:
-                            combined_docs.append({
-                                "text": doc,
-                                "score": 1 - embedding_results['distances'][i][j],  # 转换为相似度分数
-                                "source": f"嵌入相似度 (文档: {doc_id})"
-                            })
-                            seen_ids.add(chunk_id)
+                        results.append({
+                            "text": doc,
+                            "score": 1 - embedding_results['distances'][i][j],  # 转换为相似度分数
+                            "source": f"嵌入相似度 (文档: {doc_id})"
+                        })
             
-            # 处理文本检索结果
-            if text_results['documents']:
-                for i, doc_list in enumerate(text_results['documents']):
-                    for j, doc in enumerate(doc_list):
-                        chunk_id = text_results['ids'][i][j]
-                        if chunk_id not in seen_ids:
-                            combined_docs.append({
-                                "text": doc,
-                                "score": text_results['distances'][i][j],  # 这里可能是相似度分数
-                                "source": f"文本相似度 (文档: {doc_id})"
-                            })
-                            seen_ids.add(chunk_id)
-            
-            results.extend(combined_docs)
         except Exception as e:
             logger.error(f"检索文档 {doc_id} 时出错: {e}")
             continue
