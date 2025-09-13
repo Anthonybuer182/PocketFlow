@@ -1488,6 +1488,18 @@
             transition: opacity 0.3s ease;
         }
         
+        /* 思考指示器样式 */
+        .thinking-indicator {
+            color: #6c757d;
+            font-weight: 600;
+            animation: blink 1.5s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
         /* 确保普通文本消息的样式一致性 */
         .user-message p,
         .bot-message:not(.markdown-content) p {
@@ -1948,7 +1960,9 @@
             messageElement.id = messageId;
             messageElement.innerHTML = `
                 <strong>AI助手</strong>
-                <div id="${contentId}" class="markdown-content"></div>
+                <div id="${contentId}" class="markdown-content">
+                    <span class="thinking-indicator">...</span>
+                </div>
             `;
             messagesContainer.appendChild(messageElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -1957,7 +1971,8 @@
             window.currentStreamingMessage = {
                 messageId: messageId,
                 contentId: contentId,
-                accumulatedText: ''
+                accumulatedText: '',
+                hasStarted: false // 标记是否已经开始显示实际内容
             };
         }
 
@@ -1970,9 +1985,15 @@
                 // 累积文本
                 window.currentStreamingMessage.accumulatedText += chunk;
                 
-                // 始终使用markdown渲染，但对于不完整的markdown语法进行特殊处理
-                const renderedContent = renderMarkdownWithFallback(window.currentStreamingMessage.accumulatedText);
-                contentElement.innerHTML = renderedContent;
+                // 如果是第一次收到数据，移除思考指示器
+                if (!window.currentStreamingMessage.hasStarted) {
+                    window.currentStreamingMessage.hasStarted = true;
+                    // 移除思考指示器，直接在三个点后面显示内容
+                    contentElement.innerHTML = renderMarkdownWithFallback(window.currentStreamingMessage.accumulatedText);
+                } else {
+                    // 更新现有内容
+                    contentElement.innerHTML = renderMarkdownWithFallback(window.currentStreamingMessage.accumulatedText);
+                }
                 
                 // 应用流式渲染动画
                 applyStreamingAnimation(contentElement);
