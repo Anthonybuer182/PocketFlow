@@ -360,11 +360,15 @@
             background: linear-gradient(135deg, rgba(110, 142, 251, 0.1) 0%, rgba(167, 119, 227, 0.1) 100%);
             color: var(--primary);
             font-size: 0.9rem;
-            padding: 16px;
-            border-radius: 12px;
+            padding: 18px;
+            border-radius: 20px;
             margin: 15px 0;
-            border: 1px solid rgba(110, 142, 251, 0.2);
+            border: 1px solid rgba(110, 142, 251, 0.1);
             text-align: left;
+            max-width: 80%;
+            margin-right: auto;
+            border-bottom-left-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
         }
 
         .context-header {
@@ -1641,17 +1645,16 @@
             const documents = contextInfo.documents || [];
             const totalDocs = documents.length;
             
-            // 构建消息内容
-            let html = `
-                <div class="context-header">
-                    <i class="fas fa-info-circle"></i> 
-                    <span>引用了 ${totalDocs} 个文档</span>
-                    <button class="toggle-details-btn" onclick="toggleContextDetails(this)">
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
-                </div>
-                <div class="context-details" style="display: none;">
-            `;
+        // 构建消息内容
+        let html = `
+            <div class="context-header">
+                <span>引用了 ${totalDocs} 个文档</span>
+                <button class="toggle-details-btn" onclick="toggleContextDetails(this)">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="context-details" style="display: none;">
+        `;
             
             if (totalDocs === 0) {
                 html += `<div class="no-documents">未引用任何文档</div>`;
