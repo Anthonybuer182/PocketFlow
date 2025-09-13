@@ -60,9 +60,8 @@ def recursive_text_split(
                         )
                     )
             
-            # # 合并小块并处理重叠
-            # return _merge_splits_with_overlap(chunks, chunk_size, chunk_overlap, length_function)
-            return chunks
+            # 合并小块并处理重叠
+            return _merge_splits_with_overlap(chunks, chunk_size, chunk_overlap, length_function)
     
     # 如果所有分隔符都失败，按字符分割
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size - chunk_overlap)]
