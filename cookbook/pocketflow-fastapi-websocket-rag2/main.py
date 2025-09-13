@@ -45,11 +45,11 @@ chroma_client = chromadb.PersistentClient(path="data/chroma")
 logger.info("向量数据库客户端初始化完成")
 
 # 初始化嵌入模型
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-logger.info("嵌入模型初始化完成: all-MiniLM-L6-v2")
+embedding_model = SentenceTransformer('shibing624/text2vec-base-chinese')
+logger.info("嵌入模型初始化完成: shibing624/text2vec-base-chinese")
 # 初始化重排模型
-reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
-logger.info("重排模型初始化完成: cross-encoder/ms-marco-MiniLM-L-6-v2")
+reranker = CrossEncoder('cross-encoder/mmarco-mMiniLMv2-L12-H384-v1')
+logger.info("重排模型初始化完成: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")
 
 # 初始化SQLite数据库
 def init_db():
