@@ -1624,6 +1624,7 @@
     <script>
         let websocket = null;
         let selectedDocs = []; // 存储选中的文档ID列表
+        let lastUserMessage = ''; // 存储用户最后发送的消息，用于关键词高亮
 
         // 初始化页面
         document.addEventListener('DOMContentLoaded', function() {
@@ -1806,6 +1807,9 @@
             
             if (!message) return;
             
+            // 保存用户消息用于后续关键词高亮
+            lastUserMessage = message;
+            
             // 添加用户消息到聊天界面
             addMessage(message, 'user');
             input.value = '';
@@ -1899,10 +1903,12 @@
                         html += `<div class="no-content">暂无相关信息</div>`;
                     } else {
                         relevantInfo.forEach((info, infoIndex) => {
+                            // 使用关键词高亮功能处理信息文本
+                            const highlightedInfo = highlightKeywords(info, lastUserMessage);
                             html += `
                                 <div class="info-item">
                                     <span class="info-number">${infoIndex + 1}.</span>
-                                    <span class="info-text">${info}</span>
+                                    <span class="info-text">${highlightedInfo}</span>
                                 </div>
                             `;
                         });
@@ -2066,6 +2072,32 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // 高亮文本中的关键词
+        function highlightKeywords(text, query) {
+            if (!query || !text) return escapeHtml(text);
+            
+            // 将查询拆分为单词，过滤掉空字符串
+            const keywords = query.split(/\s+/).filter(word => word.length > 0);
+            
+            if (keywords.length === 0) return escapeHtml(text);
+            
+            // 为每个关键词创建正则表达式，不区分大小写
+            const regexPatterns = keywords.map(keyword => 
+                new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+            );
+            
+            let highlightedText = escapeHtml(text);
+            
+            // 对每个关键词进行高亮处理
+            regexPatterns.forEach(regex => {
+                highlightedText = highlightedText.replace(regex, 
+                    match => `<span class="search-highlight">${match}</span>`
+                );
+            });
+            
+            return highlightedText;
         }
 
         // 渲染Markdown内容
